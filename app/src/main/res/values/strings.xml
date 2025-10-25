@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Рабочее место учителя</string>
+    <string name="welcome_title">Добро пожаловать в рабочее место учителя проекта Кубышка</string>
+    <string name="login_hint">Логин</string>
+    <string name="password_hint">Пароль</string>
+    <string name="sign_in">Войти</string>
+    <string name="login_error">Ошибка авторизации</string>
+</resources>
