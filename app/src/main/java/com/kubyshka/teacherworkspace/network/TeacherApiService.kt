@@ -73,6 +73,7 @@ fun createTeacherApiService(): TeacherApiService {
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         })
+        .cookieJar(InMemoryCookieJar())
         .addInterceptor { chain ->
             val request = chain.request().newBuilder()
                 .header("Content-Type", "application/json")
