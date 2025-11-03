@@ -4,11 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kubyshka.teacherworkspace.data.SessionManager
 import com.kubyshka.teacherworkspace.data.TeacherRepository
+import com.kubyshka.teacherworkspace.network.ApiResponse
 import com.kubyshka.teacherworkspace.network.LoginResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import retrofit2.HttpException
+import java.io.IOException
 
 sealed interface LoginStatus {
     object Idle : LoginStatus
@@ -30,6 +35,7 @@ class LoginViewModel(
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+    private val json = Json { ignoreUnknownKeys = true }
 
     fun onUsernameChanged(value: String) {
         _uiState.value = _uiState.value.copy(username = value)
@@ -61,11 +67,40 @@ class LoginViewModel(
                         ?: "Не удалось войти. Проверьте данные."
                     _uiState.value = _uiState.value.copy(status = LoginStatus.Error(message))
                 }
+            } catch (exception: HttpException) {
+                _uiState.value = _uiState.value.copy(
+                    status = LoginStatus.Error(parseServerError(exception))
+                )
+            } catch (exception: IOException) {
+                _uiState.value = _uiState.value.copy(
+                    status = LoginStatus.Error("Проверьте подключение к интернету и попробуйте ещё раз")
+                )
             } catch (exception: Exception) {
                 _uiState.value = _uiState.value.copy(
                     status = LoginStatus.Error(exception.localizedMessage ?: "Неизвестная ошибка")
                 )
             }
+        }
+    }
+
+    private fun parseServerError(exception: HttpException): String {
+        val errorBody = exception.response()?.errorBody()?.string()
+        if (!errorBody.isNullOrBlank()) {
+            runCatching {
+                val apiResponse = json.decodeFromString<ApiResponse>(errorBody)
+                val message = apiResponse.message?.takeIf { it.isNotBlank() }
+                if (message != null) {
+                    return message
+                }
+            }
+            if (!errorBody.trimStart().startsWith("<")) {
+                return errorBody
+            }
+        }
+
+        return when (exception.code()) {
+            in 500..599 -> "На сервере произошла ошибка. Попробуйте повторить попытку позже."
+            else -> "Запрос завершился с ошибкой ${exception.code()}"
         }
     }
 }
