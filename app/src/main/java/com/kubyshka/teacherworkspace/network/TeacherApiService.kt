@@ -11,7 +11,7 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import retrofit2.http.Body
 import retrofit2.http.POST
 
-private const val API_BASE_URL = "http://217.25.239.54:8004/API/"
+private const val API_BASE_URL = "https://piggybank.torpedovrn.ru/api/"
 
 @Serializable
 data class EmptyRequest(val placeholder: String = "")
