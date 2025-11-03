@@ -8,7 +8,7 @@ import com.kubyshka.teacherworkspace.network.TeacherApiService
 class TeacherRepository(private val apiService: TeacherApiService) {
 
     suspend fun login(username: String, password: String): LoginResponse {
-        return apiService.login(LoginRequest(username = username, password = password))
+        return apiService.login(LoginRequest(login = username, password = password))
     }
 
     suspend fun ping(): ApiResponse {

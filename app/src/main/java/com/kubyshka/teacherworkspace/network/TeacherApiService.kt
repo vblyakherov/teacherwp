@@ -22,7 +22,8 @@ data class ApiResponse(
 
 @Serializable
 data class LoginRequest(
-    @SerialName("username") val username: String,
+    @SerialName("login") val login: String,
+    @SerialName("username") val username: String = login,
     @SerialName("password") val password: String
 )
 
@@ -77,6 +78,7 @@ fun createTeacherApiService(): TeacherApiService {
         .addInterceptor { chain ->
             val request = chain.request().newBuilder()
                 .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
                 .build()
             chain.proceed(request)
         }
