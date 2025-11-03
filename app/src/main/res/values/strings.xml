@@ -5,4 +5,7 @@
     <string name="password_hint">Пароль</string>
     <string name="sign_in">Войти</string>
     <string name="login_error">Ошибка авторизации</string>
+    <string name="server_checking_message">Проверка соединения с сервером…</string>
+    <string name="server_unavailable_message">Нет соединения с сервером</string>
+    <string name="refresh">Обновить</string>
 </resources>

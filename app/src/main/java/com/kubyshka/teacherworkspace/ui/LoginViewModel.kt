@@ -22,10 +22,17 @@ sealed interface LoginStatus {
     data class Success(val response: LoginResponse) : LoginStatus
 }
 
+sealed interface ServerStatus {
+    object Checking : ServerStatus
+    object Available : ServerStatus
+    data class Unavailable(val message: String? = null) : ServerStatus
+}
+
 data class LoginUiState(
     val username: String = "",
     val password: String = "",
-    val status: LoginStatus = LoginStatus.Idle
+    val status: LoginStatus = LoginStatus.Idle,
+    val serverStatus: ServerStatus = ServerStatus.Checking
 )
 
 class LoginViewModel(
@@ -37,6 +44,10 @@ class LoginViewModel(
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
     private val json = Json { ignoreUnknownKeys = true }
 
+    init {
+        checkServerAvailability()
+    }
+
     fun onUsernameChanged(value: String) {
         _uiState.value = _uiState.value.copy(username = value)
     }
@@ -45,7 +56,36 @@ class LoginViewModel(
         _uiState.value = _uiState.value.copy(password = value)
     }
 
+    fun checkServerAvailability() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(serverStatus = ServerStatus.Checking)
+            try {
+                val response = repository.ping()
+                if (response.success) {
+                    _uiState.value = _uiState.value.copy(serverStatus = ServerStatus.Available)
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        serverStatus = ServerStatus.Unavailable(response.message?.takeIf { it.isNotBlank() })
+                    )
+                }
+            } catch (exception: HttpException) {
+                _uiState.value = _uiState.value.copy(
+                    serverStatus = ServerStatus.Unavailable(parseServerError(exception))
+                )
+            } catch (exception: IOException) {
+                _uiState.value = _uiState.value.copy(serverStatus = ServerStatus.Unavailable())
+            } catch (exception: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    serverStatus = ServerStatus.Unavailable(exception.localizedMessage?.takeIf { it.isNotBlank() })
+                )
+            }
+        }
+    }
+
     fun login() {
+        if (_uiState.value.serverStatus !is ServerStatus.Available) {
+            return
+        }
         val username = _uiState.value.username.trim()
         val password = _uiState.value.password
         if (username.isBlank() || password.isBlank()) {
