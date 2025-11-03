@@ -67,6 +67,7 @@ interface TeacherApiService {
 private val json = Json {
     ignoreUnknownKeys = true
     isLenient = true
+    encodeDefaults = true
 }
 
 fun createTeacherApiService(): TeacherApiService {
