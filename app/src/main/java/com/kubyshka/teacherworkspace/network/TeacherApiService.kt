@@ -75,11 +75,15 @@ fun createTeacherApiService(): TeacherApiService {
         })
         .cookieJar(InMemoryCookieJar())
         .addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-                .header("Content-Type", "application/json")
+            val originalRequest = chain.request()
+            val requestBuilder = originalRequest.newBuilder()
                 .header("Accept", "application/json")
-                .build()
-            chain.proceed(request)
+
+            if (originalRequest.body != null) {
+                requestBuilder.header("Content-Type", "application/json")
+            }
+
+            chain.proceed(requestBuilder.build())
         }
         .build()
 
