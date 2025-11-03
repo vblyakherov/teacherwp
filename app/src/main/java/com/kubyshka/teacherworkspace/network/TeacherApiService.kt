@@ -22,8 +22,7 @@ data class ApiResponse(
 
 @Serializable
 data class LoginRequest(
-    @SerialName("login") val login: String,
-    @SerialName("username") val username: String = login,
+    @SerialName("username") val username: String,
     @SerialName("password") val password: String
 )
 
