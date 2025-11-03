@@ -9,12 +9,10 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
 
-private const val API_BASE_URL = "https://piggybank.torpedovrn.ru/api/"
-
-@Serializable
-data class EmptyRequest(val placeholder: String = "")
+private const val API_BASE_URL = "https://piggybank.torpedovrn.ru/Api/"
 
 @Serializable
 data class ApiResponse(
@@ -58,8 +56,8 @@ data class School(
 )
 
 interface TeacherApiService {
-    @POST("Ping")
-    suspend fun ping(@Body body: EmptyRequest = EmptyRequest()): ApiResponse
+    @GET("Ping")
+    suspend fun ping(): ApiResponse
 
     @POST("Login")
     suspend fun login(@Body request: LoginRequest): LoginResponse

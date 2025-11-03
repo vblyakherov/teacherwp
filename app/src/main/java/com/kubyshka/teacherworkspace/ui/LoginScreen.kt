@@ -34,7 +34,8 @@ fun LoginRoute(viewModel: LoginViewModel) {
             uiState = uiState,
             onUsernameChanged = viewModel::onUsernameChanged,
             onPasswordChanged = viewModel::onPasswordChanged,
-            onLoginClick = viewModel::login
+            onLoginClick = viewModel::login,
+            onRetryConnectionCheck = viewModel::checkServerAvailability
         )
     }
 }
@@ -44,11 +45,13 @@ fun LoginScreen(
     uiState: LoginUiState,
     onUsernameChanged: (String) -> Unit,
     onPasswordChanged: (String) -> Unit,
-    onLoginClick: () -> Unit
+    onLoginClick: () -> Unit,
+    onRetryConnectionCheck: () -> Unit
 ) {
     val isLoading = uiState.status is LoginStatus.Loading
     val errorMessage = (uiState.status as? LoginStatus.Error)?.message
     val successResponse = (uiState.status as? LoginStatus.Success)?.response
+    val isServerAvailable = uiState.serverStatus is ServerStatus.Available
 
     Column(
         modifier = Modifier
@@ -72,6 +75,7 @@ fun LoginScreen(
                 keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Next
             ),
+            enabled = isServerAvailable && !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
@@ -88,6 +92,7 @@ fun LoginScreen(
                 imeAction = ImeAction.Done
             ),
             keyboardActions = KeyboardActions(onDone = { onLoginClick() }),
+            enabled = isServerAvailable && !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 24.dp)
@@ -95,7 +100,7 @@ fun LoginScreen(
 
         Button(
             onClick = onLoginClick,
-            enabled = !isLoading,
+            enabled = isServerAvailable && !isLoading,
             modifier = Modifier.fillMaxWidth()
         ) {
             if (isLoading) {
@@ -124,6 +129,36 @@ fun LoginScreen(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 16.dp)
             )
+        }
+
+        when (val serverStatus = uiState.serverStatus) {
+            ServerStatus.Checking -> {
+                Text(
+                    text = stringResource(id = R.string.server_checking_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            }
+
+            ServerStatus.Available -> Unit
+
+            is ServerStatus.Unavailable -> {
+                Text(
+                    text = serverStatus.message
+                        ?: stringResource(id = R.string.server_unavailable_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+                Button(
+                    onClick = onRetryConnectionCheck,
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .fillMaxWidth()
+                ) {
+                    Text(text = stringResource(id = R.string.refresh))
+                }
+            }
         }
     }
 }
