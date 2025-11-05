@@ -74,6 +74,7 @@ class LoginViewModel(
 
     private var storedSessionKey: String? = null
     private var storedPinCode: String? = null
+    private var storedCoachId: Int? = null
 
     init {
         observeStoredData()
@@ -260,6 +261,7 @@ class LoginViewModel(
             sessionManager.clearAll()
             storedSessionKey = null
             storedPinCode = null
+            storedCoachId = null
             _uiState.update {
                 it.copy(
                     username = "",
@@ -283,11 +285,22 @@ class LoginViewModel(
             clearPinAndReturnToCredentials()
             return
         }
+        val coachId = storedCoachId
+        if (coachId == null) {
+            _uiState.update {
+                it.copy(
+                    scheduleStatus = ScheduleStatus.Error(
+                        "Не удалось определить преподавателя для загрузки расписания"
+                    )
+                )
+            }
+            return
+        }
 
         viewModelScope.launch {
             _uiState.update { it.copy(scheduleStatus = ScheduleStatus.Loading) }
             try {
-                val response = repository.getTodaySchedule(sessionKey)
+                val response = repository.getTodaySchedule(sessionKey, coachId)
                 if (response.success) {
                     val lessons = response.data.orEmpty()
                     val dateLabel = buildScheduleDateLabel(lessons)
@@ -333,8 +346,10 @@ class LoginViewModel(
             sessionManager.clearPinCode()
             sessionManager.clearSession()
             sessionManager.clearTeacherName()
+            sessionManager.clearCoachId()
             storedPinCode = null
             storedSessionKey = null
+            storedCoachId = null
             _uiState.update {
                 it.copy(
                     pinInput = "",
@@ -370,6 +385,11 @@ class LoginViewModel(
                 _uiState.update { it.copy(teacherName = name) }
             }
         }
+        viewModelScope.launch {
+            sessionManager.coachIdFlow.collect { value ->
+                storedCoachId = value
+            }
+        }
     }
 
     private fun decideInitialScreen(current: LoginUiState): LoginUiState {
@@ -397,6 +417,10 @@ class LoginViewModel(
         val sessionKey = response.sessionKey ?: return
         sessionManager.saveSessionKey(sessionKey)
         storedSessionKey = sessionKey
+        response.couch?.id?.let { coachId ->
+            sessionManager.saveCoachId(coachId)
+            storedCoachId = coachId
+        }
         val teacherName = response.couch?.name
             ?: response.user?.name
         if (!teacherName.isNullOrBlank()) {

@@ -76,7 +76,8 @@ data class School(
 
 @Serializable
 data class ScheduleRequest(
-    @SerialName("session_key") val sessionKey: String
+    @SerialName("session_key") val sessionKey: String,
+    @SerialName("couch_id") val coachId: Int? = null
 )
 
 @Serializable

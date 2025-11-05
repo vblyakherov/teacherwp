@@ -17,7 +17,12 @@ class TeacherRepository(private val apiService: TeacherApiService) {
         return apiService.ping()
     }
 
-    suspend fun getTodaySchedule(sessionKey: String): ScheduleResponse {
-        return apiService.getTodaySchedule(ScheduleRequest(sessionKey = sessionKey))
+    suspend fun getTodaySchedule(sessionKey: String, coachId: Int?): ScheduleResponse {
+        return apiService.getTodaySchedule(
+            ScheduleRequest(
+                sessionKey = sessionKey,
+                coachId = coachId
+            )
+        )
     }
 }
