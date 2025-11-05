@@ -3,6 +3,7 @@ package com.kubyshka.teacherworkspace.data
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +17,7 @@ class SessionManager(private val context: Context) {
     private val sessionKey = stringPreferencesKey("session_key")
     private val pinCode = stringPreferencesKey("pin_code")
     private val teacherName = stringPreferencesKey("teacher_name")
+    private val coachId = intPreferencesKey("coach_id")
 
     val sessionKeyFlow: Flow<String?> = context.dataStore.data.map { preferences: Preferences ->
         preferences[sessionKey]
@@ -27,6 +29,10 @@ class SessionManager(private val context: Context) {
 
     val teacherNameFlow: Flow<String?> = context.dataStore.data.map { preferences: Preferences ->
         preferences[teacherName]
+    }
+
+    val coachIdFlow: Flow<Int?> = context.dataStore.data.map { preferences: Preferences ->
+        preferences[coachId]
     }
 
     suspend fun saveSessionKey(value: String) {
@@ -44,6 +50,12 @@ class SessionManager(private val context: Context) {
     suspend fun saveTeacherName(value: String) {
         context.dataStore.edit { preferences ->
             preferences[teacherName] = value
+        }
+    }
+
+    suspend fun saveCoachId(value: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[coachId] = value
         }
     }
 
@@ -65,11 +77,18 @@ class SessionManager(private val context: Context) {
         }
     }
 
+    suspend fun clearCoachId() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(coachId)
+        }
+    }
+
     suspend fun clearAll() {
         context.dataStore.edit { preferences ->
             preferences.remove(sessionKey)
             preferences.remove(pinCode)
             preferences.remove(teacherName)
+            preferences.remove(coachId)
         }
     }
 }
