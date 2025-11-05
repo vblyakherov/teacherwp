@@ -10,8 +10,11 @@ import com.kubyshka.teacherworkspace.network.ScheduleItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
@@ -280,24 +283,34 @@ class LoginViewModel(
     }
 
     private fun loadSchedule() {
-        val sessionKey = storedSessionKey
-        if (sessionKey.isNullOrBlank()) {
-            clearPinAndReturnToCredentials()
-            return
-        }
-        val coachId = storedCoachId
-        if (coachId == null) {
-            _uiState.update {
-                it.copy(
-                    scheduleStatus = ScheduleStatus.Error(
-                        "Не удалось определить преподавателя для загрузки расписания"
-                    )
-                )
-            }
-            return
-        }
-
         viewModelScope.launch {
+            val sessionKey = storedSessionKey
+            if (sessionKey.isNullOrBlank()) {
+                clearPinAndReturnToCredentials()
+                return@launch
+            }
+
+            var coachId = storedCoachId
+            if (coachId == null) {
+                coachId = withTimeoutOrNull(1_000) {
+                    sessionManager.coachIdFlow.filterNotNull().firstOrNull()
+                }
+                if (coachId != null) {
+                    storedCoachId = coachId
+                }
+            }
+
+            if (coachId == null) {
+                _uiState.update {
+                    it.copy(
+                        scheduleStatus = ScheduleStatus.Error(
+                            "Не удалось определить преподавателя для загрузки расписания"
+                        )
+                    )
+                }
+                return@launch
+            }
+
             _uiState.update { it.copy(scheduleStatus = ScheduleStatus.Loading) }
             try {
                 val response = repository.getTodaySchedule(sessionKey, coachId)
