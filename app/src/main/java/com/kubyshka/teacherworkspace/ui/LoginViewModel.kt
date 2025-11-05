@@ -10,11 +10,8 @@ import com.kubyshka.teacherworkspace.network.ScheduleItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
@@ -283,39 +280,30 @@ class LoginViewModel(
     }
 
     private fun loadSchedule() {
-        viewModelScope.launch {
-            val sessionKey = storedSessionKey
-            if (sessionKey.isNullOrBlank()) {
-                clearPinAndReturnToCredentials()
-                return@launch
-            }
+        val sessionKey = storedSessionKey
+        if (sessionKey.isNullOrBlank()) {
+            clearPinAndReturnToCredentials()
+            return
+        }
 
-            var coachId = storedCoachId
-            if (coachId == null) {
-                coachId = withTimeoutOrNull(1_000) {
-                    sessionManager.coachIdFlow.filterNotNull().firstOrNull()
-                }
-                if (coachId != null) {
-                    storedCoachId = coachId
-                }
-            }
-
-            if (coachId == null) {
-                _uiState.update {
-                    it.copy(
-                        scheduleStatus = ScheduleStatus.Error(
-                            "Не удалось определить преподавателя для загрузки расписания"
-                        )
+        val coachId = storedCoachId
+        if (coachId == null) {
+            _uiState.update {
+                it.copy(
+                    scheduleStatus = ScheduleStatus.Error(
+                        "Не удалось определить преподавателя для загрузки расписания"
                     )
-                }
-                return@launch
+                )
             }
+            return
+        }
 
+        viewModelScope.launch {
             _uiState.update { it.copy(scheduleStatus = ScheduleStatus.Loading) }
             try {
                 val response = repository.getTodaySchedule(sessionKey, coachId)
                 if (response.success) {
-                    val lessons = response.data.orEmpty()
+                    val lessons = prepareLessonsForDisplay(response.data.orEmpty())
                     val dateLabel = buildScheduleDateLabel(lessons)
                     _uiState.update {
                         it.copy(
@@ -430,11 +418,11 @@ class LoginViewModel(
         val sessionKey = response.sessionKey ?: return
         sessionManager.saveSessionKey(sessionKey)
         storedSessionKey = sessionKey
-        response.coach?.id?.let { coachId ->
+        response.primaryCoach()?.id?.let { coachId ->
             sessionManager.saveCoachId(coachId)
             storedCoachId = coachId
         }
-        val teacherName = response.coach?.name
+        val teacherName = response.primaryCoach()?.name
             ?: response.user?.name
         if (!teacherName.isNullOrBlank()) {
             sessionManager.saveTeacherName(teacherName)
@@ -457,6 +445,26 @@ class LoginViewModel(
         val date = runCatching { daySource?.let { formatter.parse(it) } }.getOrNull() ?: Date()
         return displayFormatter.format(date)
     }
+
+    private fun prepareLessonsForDisplay(lessons: List<ScheduleItem>): List<ScheduleItem> {
+        if (lessons.isEmpty()) {
+            return emptyList()
+        }
+
+        return lessons
+            .distinctBy { lesson ->
+                lesson.groupScheduleId ?: "${lesson.date}|${lesson.time}|${lesson.courseGroupId}"
+            }
+            .sortedWith(
+                compareBy(
+                    { lesson -> lesson.date.orEmpty() },
+                    { lesson -> lesson.time.orEmpty() },
+                    { lesson -> lesson.courseName.orEmpty() }
+                )
+            )
+    }
+
+    private fun LoginResponse.primaryCoach() = coach ?: couch
 
     private fun parseServerError(exception: HttpException): String {
         val errorBody = exception.response()?.errorBody()?.string()
