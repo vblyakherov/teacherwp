@@ -38,21 +38,67 @@ data class LoginResponse(
 
 @Serializable
 data class User(
-    val id: Int? = null,
-    val name: String? = null,
-    val email: String? = null
+    @SerialName("user_id") val id: Int? = null,
+    @SerialName("school_id") val schoolId: Int? = null,
+    @SerialName("user_name") val name: String? = null,
+    @SerialName("user_phone") val phone: String? = null,
+    @SerialName("user_email") val email: String? = null,
+    @SerialName("user_login") val login: String? = null
 )
 
 @Serializable
 data class Coach(
-    val id: Int? = null,
-    val name: String? = null
+    @SerialName("couch_id") val id: Int? = null,
+    @SerialName("school_id") val schoolId: Int? = null,
+    @SerialName("user_id") val userId: Int? = null,
+    @SerialName("couch_name") val name: String? = null,
+    @SerialName("couch_phone") val phone: String? = null,
+    @SerialName("couch_email") val email: String? = null,
+    @SerialName("couch_master_id") val masterId: Int? = null,
+    @SerialName("couch_is_master") val isMaster: Int? = null,
+    @SerialName("couch_active") val isActive: Int? = null
 )
 
 @Serializable
 data class School(
-    val id: Int? = null,
-    val title: String? = null
+    @SerialName("school_id") val id: Int? = null,
+    @SerialName("school_name") val name: String? = null,
+    @SerialName("school_domain") val domain: String? = null,
+    @SerialName("school_address") val address: String? = null,
+    @SerialName("school_inn") val inn: String? = null,
+    @SerialName("school_kpp") val kpp: String? = null,
+    @SerialName("school_ogrn") val ogrn: String? = null,
+    @SerialName("school_theme") val theme: String? = null,
+    @SerialName("school_logo") val logo: String? = null,
+    @SerialName("school_active") val isActive: Int? = null,
+    @SerialName("school_options") val options: String? = null
+)
+
+@Serializable
+data class ScheduleRequest(
+    @SerialName("session_key") val sessionKey: String
+)
+
+@Serializable
+data class ScheduleResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val data: List<ScheduleItem>? = null
+)
+
+@Serializable
+data class ScheduleItem(
+    @SerialName("group_schedule_id") val groupScheduleId: Int? = null,
+    @SerialName("course_group_id") val courseGroupId: Int? = null,
+    @SerialName("couch_id") val coachId: Int? = null,
+    @SerialName("classroom_id") val classroomId: Int? = null,
+    @SerialName("group_schedule_date") val date: String? = null,
+    @SerialName("group_schedule_time") val time: String? = null,
+    @SerialName("lesson_state") val lessonState: Int? = null,
+    @SerialName("lesson_started") val lessonStarted: String? = null,
+    @SerialName("course_name") val courseName: String? = null,
+    @SerialName("course_group_title") val courseGroupTitle: String? = null,
+    @SerialName("classroom_name") val classroomName: String? = null
 )
 
 interface TeacherApiService {
@@ -61,6 +107,9 @@ interface TeacherApiService {
 
     @POST("Login")
     suspend fun login(@Body request: LoginRequest): LoginResponse
+
+    @POST("Schedule/Today")
+    suspend fun getTodaySchedule(@Body request: ScheduleRequest): ScheduleResponse
 }
 
 private val json = Json {
