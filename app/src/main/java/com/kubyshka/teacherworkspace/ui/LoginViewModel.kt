@@ -430,11 +430,11 @@ class LoginViewModel(
         val sessionKey = response.sessionKey ?: return
         sessionManager.saveSessionKey(sessionKey)
         storedSessionKey = sessionKey
-        response.couch?.id?.let { coachId ->
+        response.coach?.id?.let { coachId ->
             sessionManager.saveCoachId(coachId)
             storedCoachId = coachId
         }
-        val teacherName = response.couch?.name
+        val teacherName = response.coach?.name
             ?: response.user?.name
         if (!teacherName.isNullOrBlank()) {
             sessionManager.saveTeacherName(teacherName)
