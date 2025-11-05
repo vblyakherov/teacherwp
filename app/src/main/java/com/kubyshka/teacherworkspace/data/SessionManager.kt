@@ -14,9 +14,19 @@ private val Context.dataStore by preferencesDataStore(name = SESSION_PREFERENCES
 class SessionManager(private val context: Context) {
 
     private val sessionKey = stringPreferencesKey("session_key")
+    private val pinCode = stringPreferencesKey("pin_code")
+    private val teacherName = stringPreferencesKey("teacher_name")
 
     val sessionKeyFlow: Flow<String?> = context.dataStore.data.map { preferences: Preferences ->
         preferences[sessionKey]
+    }
+
+    val pinCodeFlow: Flow<String?> = context.dataStore.data.map { preferences: Preferences ->
+        preferences[pinCode]
+    }
+
+    val teacherNameFlow: Flow<String?> = context.dataStore.data.map { preferences: Preferences ->
+        preferences[teacherName]
     }
 
     suspend fun saveSessionKey(value: String) {
@@ -25,9 +35,41 @@ class SessionManager(private val context: Context) {
         }
     }
 
+    suspend fun savePinCode(value: String) {
+        context.dataStore.edit { preferences ->
+            preferences[pinCode] = value
+        }
+    }
+
+    suspend fun saveTeacherName(value: String) {
+        context.dataStore.edit { preferences ->
+            preferences[teacherName] = value
+        }
+    }
+
     suspend fun clearSession() {
         context.dataStore.edit { preferences ->
             preferences.remove(sessionKey)
+        }
+    }
+
+    suspend fun clearPinCode() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(pinCode)
+        }
+    }
+
+    suspend fun clearTeacherName() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(teacherName)
+        }
+    }
+
+    suspend fun clearAll() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(sessionKey)
+            preferences.remove(pinCode)
+            preferences.remove(teacherName)
         }
     }
 }

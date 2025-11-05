@@ -3,6 +3,8 @@ package com.kubyshka.teacherworkspace.data
 import com.kubyshka.teacherworkspace.network.ApiResponse
 import com.kubyshka.teacherworkspace.network.LoginRequest
 import com.kubyshka.teacherworkspace.network.LoginResponse
+import com.kubyshka.teacherworkspace.network.ScheduleRequest
+import com.kubyshka.teacherworkspace.network.ScheduleResponse
 import com.kubyshka.teacherworkspace.network.TeacherApiService
 
 class TeacherRepository(private val apiService: TeacherApiService) {
@@ -13,5 +15,9 @@ class TeacherRepository(private val apiService: TeacherApiService) {
 
     suspend fun ping(): ApiResponse {
         return apiService.ping()
+    }
+
+    suspend fun getTodaySchedule(sessionKey: String): ScheduleResponse {
+        return apiService.getTodaySchedule(ScheduleRequest(sessionKey = sessionKey))
     }
 }
