@@ -21,7 +21,8 @@ class TeacherRepository(private val apiService: TeacherApiService) {
         return apiService.getTodaySchedule(
             ScheduleRequest(
                 sessionKey = sessionKey,
-                coachId = coachId
+                coachId = coachId,
+                couchId = coachId
             )
         )
     }

@@ -33,6 +33,7 @@ data class LoginResponse(
     @SerialName("session_key") val sessionKey: String? = null,
     val user: User? = null,
     @SerialName("coach") val coach: Coach? = null,
+    @SerialName("couch") val couch: Coach? = null,
     val school: School? = null
 )
 
@@ -48,16 +49,31 @@ data class User(
 
 @Serializable
 data class Coach(
-    @SerialName("coach_id") val id: Int? = null,
+    @SerialName("coach_id") val coachId: Int? = null,
+    @SerialName("couch_id") val couchId: Int? = null,
     @SerialName("school_id") val schoolId: Int? = null,
     @SerialName("user_id") val userId: Int? = null,
-    @SerialName("coach_name") val name: String? = null,
-    @SerialName("coach_phone") val phone: String? = null,
-    @SerialName("coach_email") val email: String? = null,
-    @SerialName("coach_master_id") val masterId: Int? = null,
-    @SerialName("coach_is_master") val isMaster: Int? = null,
-    @SerialName("coach_active") val isActive: Int? = null
-)
+    @SerialName("coach_name") val coachName: String? = null,
+    @SerialName("couch_name") val couchName: String? = null,
+    @SerialName("coach_phone") val coachPhone: String? = null,
+    @SerialName("couch_phone") val couchPhone: String? = null,
+    @SerialName("coach_email") val coachEmail: String? = null,
+    @SerialName("couch_email") val couchEmail: String? = null,
+    @SerialName("coach_master_id") val coachMasterId: Int? = null,
+    @SerialName("couch_master_id") val couchMasterId: Int? = null,
+    @SerialName("coach_is_master") val coachIsMaster: Int? = null,
+    @SerialName("couch_is_master") val couchIsMaster: Int? = null,
+    @SerialName("coach_active") val coachActive: Int? = null,
+    @SerialName("couch_active") val couchActive: Int? = null
+) {
+    val id: Int? get() = coachId ?: couchId
+    val name: String? get() = coachName ?: couchName
+    val phone: String? get() = coachPhone ?: couchPhone
+    val email: String? get() = coachEmail ?: couchEmail
+    val masterId: Int? get() = coachMasterId ?: couchMasterId
+    val isMaster: Int? get() = coachIsMaster ?: couchIsMaster
+    val isActive: Int? get() = coachActive ?: couchActive
+}
 
 @Serializable
 data class School(
@@ -77,7 +93,8 @@ data class School(
 @Serializable
 data class ScheduleRequest(
     @SerialName("session_key") val sessionKey: String,
-    @SerialName("coach_id") val coachId: Int? = null
+    @SerialName("coach_id") val coachId: Int? = null,
+    @SerialName("couch_id") val couchId: Int? = null
 )
 
 @Serializable
@@ -91,7 +108,8 @@ data class ScheduleResponse(
 data class ScheduleItem(
     @SerialName("group_schedule_id") val groupScheduleId: Int? = null,
     @SerialName("course_group_id") val courseGroupId: Int? = null,
-    @SerialName("coach_id") val coachId: Int? = null,
+    @SerialName("coach_id") val coachIdValue: Int? = null,
+    @SerialName("couch_id") val couchIdValue: Int? = null,
     @SerialName("classroom_id") val classroomId: Int? = null,
     @SerialName("group_schedule_date") val date: String? = null,
     @SerialName("group_schedule_time") val time: String? = null,
@@ -100,7 +118,9 @@ data class ScheduleItem(
     @SerialName("course_name") val courseName: String? = null,
     @SerialName("course_group_title") val courseGroupTitle: String? = null,
     @SerialName("classroom_name") val classroomName: String? = null
-)
+) {
+    val coachId: Int? get() = coachIdValue ?: couchIdValue
+}
 
 interface TeacherApiService {
     @GET("Ping")
