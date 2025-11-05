@@ -32,7 +32,7 @@ data class LoginResponse(
     val message: String? = null,
     @SerialName("session_key") val sessionKey: String? = null,
     val user: User? = null,
-    val couch: Coach? = null,
+    @SerialName("coach") val coach: Coach? = null,
     val school: School? = null
 )
 
@@ -48,15 +48,15 @@ data class User(
 
 @Serializable
 data class Coach(
-    @SerialName("couch_id") val id: Int? = null,
+    @SerialName("coach_id") val id: Int? = null,
     @SerialName("school_id") val schoolId: Int? = null,
     @SerialName("user_id") val userId: Int? = null,
-    @SerialName("couch_name") val name: String? = null,
-    @SerialName("couch_phone") val phone: String? = null,
-    @SerialName("couch_email") val email: String? = null,
-    @SerialName("couch_master_id") val masterId: Int? = null,
-    @SerialName("couch_is_master") val isMaster: Int? = null,
-    @SerialName("couch_active") val isActive: Int? = null
+    @SerialName("coach_name") val name: String? = null,
+    @SerialName("coach_phone") val phone: String? = null,
+    @SerialName("coach_email") val email: String? = null,
+    @SerialName("coach_master_id") val masterId: Int? = null,
+    @SerialName("coach_is_master") val isMaster: Int? = null,
+    @SerialName("coach_active") val isActive: Int? = null
 )
 
 @Serializable
@@ -77,7 +77,7 @@ data class School(
 @Serializable
 data class ScheduleRequest(
     @SerialName("session_key") val sessionKey: String,
-    @SerialName("couch_id") val coachId: Int? = null
+    @SerialName("coach_id") val coachId: Int? = null
 )
 
 @Serializable
@@ -91,7 +91,7 @@ data class ScheduleResponse(
 data class ScheduleItem(
     @SerialName("group_schedule_id") val groupScheduleId: Int? = null,
     @SerialName("course_group_id") val courseGroupId: Int? = null,
-    @SerialName("couch_id") val coachId: Int? = null,
+    @SerialName("coach_id") val coachId: Int? = null,
     @SerialName("classroom_id") val classroomId: Int? = null,
     @SerialName("group_schedule_date") val date: String? = null,
     @SerialName("group_schedule_time") val time: String? = null,
