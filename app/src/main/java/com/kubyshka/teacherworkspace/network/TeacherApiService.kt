@@ -172,10 +172,11 @@ data class SaveLessonAttendanceRequest(
 
 @Serializable
 data class StudentAttendancePayload(
-    @SerialName("course_group_student_id") val courseGroupStudentId: Int,
-    @SerialName("student_id") val studentId: Int? = null,
+    @SerialName("course_group_student_id") val courseGroupStudentId: Int? = null,
+    @SerialName("student_id") val studentId: Int,
     @SerialName("visit_id") val visitId: Int? = null,
-    @SerialName("visit_present") val visitPresent: Int
+    @SerialName("is_visited") val isVisited: Boolean,
+    @SerialName("visit_options") val visitOptions: String = ""
 )
 
 interface TeacherApiService {
