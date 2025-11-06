@@ -174,7 +174,7 @@ data class SaveLessonAttendanceRequest(
 data class StudentAttendancePayload(
     @SerialName("student_id") val studentId: Int,
     @SerialName("is_visited") val isVisited: Boolean,
-    @SerialName("visit_options") val visitOptions: String = ""
+    @SerialName("visit_options") val visitOptions: String
 )
 
 interface TeacherApiService {

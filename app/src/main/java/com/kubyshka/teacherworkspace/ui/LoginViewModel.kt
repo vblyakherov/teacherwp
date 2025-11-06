@@ -431,7 +431,8 @@ class LoginViewModel(
             val studentId = student.studentId ?: student.courseGroupStudentId
             StudentAttendancePayload(
                 studentId = studentId,
-                isVisited = student.isPresent
+                isVisited = student.isPresent,
+                visitOptions = ""
             )
         }
 
