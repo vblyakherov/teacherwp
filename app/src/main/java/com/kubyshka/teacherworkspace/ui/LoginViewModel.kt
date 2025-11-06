@@ -42,6 +42,7 @@ sealed interface AuthScreen {
     object CreatePin : AuthScreen
     object EnterPin : AuthScreen
     object Schedule : AuthScreen
+    object Attendance : AuthScreen
 }
 
 sealed interface ScheduleStatus {
@@ -68,7 +69,7 @@ data class LessonAttendanceUiState(
 )
 
 data class StudentAttendanceUi(
-    val id: Int,
+    val courseGroupStudentId: Int,
     val studentId: Int?,
     val name: String,
     val visitId: Int?,
@@ -87,6 +88,7 @@ data class LoginUiState(
     val scheduleStatus: ScheduleStatus = ScheduleStatus.Idle,
     val lessonDetails: LessonDetailsState = LessonDetailsState.Hidden,
     val selectedLessonId: Int? = null,
+    val currentLesson: ScheduleItem? = null,
     val teacherName: String? = null,
     val pinAttemptsLeft: Int = MAX_PIN_ATTEMPTS
 )
@@ -292,7 +294,8 @@ class LoginViewModel(
                     lessonDetails = LessonDetailsState.Error(
                         "Не удалось определить выбранное занятие"
                     ),
-                    selectedLessonId = null
+                    selectedLessonId = null,
+                    currentLesson = null
                 )
             }
             return
@@ -307,7 +310,9 @@ class LoginViewModel(
         _uiState.update {
             it.copy(
                 selectedLessonId = lessonId,
-                lessonDetails = LessonDetailsState.Loading
+                lessonDetails = LessonDetailsState.Loading,
+                screen = AuthScreen.Attendance,
+                currentLesson = lesson
             )
         }
 
@@ -362,7 +367,7 @@ class LoginViewModel(
         }
     }
 
-    fun toggleStudentAttendance(studentId: Int) {
+    fun toggleStudentAttendance(courseGroupStudentId: Int) {
         _uiState.update { current ->
             val details = current.lessonDetails
             if (details !is LessonDetailsState.Loaded || details.attendance.isSaving) {
@@ -371,7 +376,7 @@ class LoginViewModel(
 
             var toggled = false
             val updatedStudents = details.attendance.students.map { student ->
-                if (student.id == studentId) {
+                if (student.courseGroupStudentId == courseGroupStudentId) {
                     toggled = true
                     student.copy(isPresent = !student.isPresent)
                 } else {
@@ -408,7 +413,9 @@ class LoginViewModel(
                     lessonDetails = LessonDetailsState.Error(
                         "Не удалось определить выбранное занятие"
                     ),
-                    selectedLessonId = null
+                    selectedLessonId = null,
+                    currentLesson = null,
+                    screen = AuthScreen.Schedule
                 )
             }
             return
@@ -422,7 +429,7 @@ class LoginViewModel(
 
         val visits = details.attendance.students.map { student ->
             StudentAttendancePayload(
-                courseGroupStudentId = student.id,
+                courseGroupStudentId = student.courseGroupStudentId,
                 studentId = student.studentId,
                 visitId = student.visitId,
                 visitPresent = if (student.isPresent) 1 else 0
@@ -453,6 +460,14 @@ class LoginViewModel(
                 if (response.success) {
                     updateAttendanceForLesson(lessonId) {
                         it.copy(isSaving = false, saveError = null, isSaveSuccessful = true)
+                    }
+                    _uiState.update { current ->
+                        current.copy(
+                            screen = AuthScreen.Schedule,
+                            lessonDetails = LessonDetailsState.Hidden,
+                            selectedLessonId = null,
+                            currentLesson = null
+                        )
                     }
                 } else {
                     val message = response.message?.takeIf { it.isNotBlank() }
@@ -504,6 +519,7 @@ class LoginViewModel(
                     scheduleStatus = ScheduleStatus.Idle,
                     lessonDetails = LessonDetailsState.Hidden,
                     selectedLessonId = null,
+                    currentLesson = null,
                     pinAttemptsLeft = MAX_PIN_ATTEMPTS,
                     teacherName = null
                 )
@@ -524,7 +540,10 @@ class LoginViewModel(
                 it.copy(
                     scheduleStatus = ScheduleStatus.Error(
                         "Не удалось определить преподавателя для загрузки расписания"
-                    )
+                    ),
+                    lessonDetails = LessonDetailsState.Hidden,
+                    selectedLessonId = null,
+                    currentLesson = null
                 )
             }
             return
@@ -535,7 +554,8 @@ class LoginViewModel(
                 it.copy(
                     scheduleStatus = ScheduleStatus.Loading,
                     lessonDetails = LessonDetailsState.Hidden,
-                    selectedLessonId = null
+                    selectedLessonId = null,
+                    currentLesson = null
                 )
             }
             try {
@@ -555,7 +575,8 @@ class LoginViewModel(
                         it.copy(
                             scheduleStatus = ScheduleStatus.Error(message),
                             lessonDetails = LessonDetailsState.Hidden,
-                            selectedLessonId = null
+                            selectedLessonId = null,
+                            currentLesson = null
                         )
                     }
                 }
@@ -565,7 +586,8 @@ class LoginViewModel(
                     it.copy(
                         scheduleStatus = ScheduleStatus.Error(message),
                         lessonDetails = LessonDetailsState.Hidden,
-                        selectedLessonId = null
+                        selectedLessonId = null,
+                        currentLesson = null
                     )
                 }
             } catch (exception: IOException) {
@@ -575,7 +597,8 @@ class LoginViewModel(
                             "Проверьте подключение к интернету и попробуйте ещё раз"
                         ),
                         lessonDetails = LessonDetailsState.Hidden,
-                        selectedLessonId = null
+                        selectedLessonId = null,
+                        currentLesson = null
                     )
                 }
             } catch (exception: Exception) {
@@ -585,7 +608,8 @@ class LoginViewModel(
                             exception.localizedMessage ?: "Неизвестная ошибка"
                         ),
                         lessonDetails = LessonDetailsState.Hidden,
-                        selectedLessonId = null
+                        selectedLessonId = null,
+                        currentLesson = null
                     )
                 }
             }
@@ -611,6 +635,7 @@ class LoginViewModel(
                     scheduleStatus = ScheduleStatus.Idle,
                     lessonDetails = LessonDetailsState.Hidden,
                     selectedLessonId = null,
+                    currentLesson = null,
                     status = LoginStatus.Idle,
                     teacherName = null
                 )
@@ -628,7 +653,10 @@ class LoginViewModel(
             sessionManager.pinCodeFlow.collect { value ->
                 storedPinCode = value
                 val current = _uiState.value
-                if (current.screen != AuthScreen.Schedule && current.serverStatus is ServerStatus.Available) {
+                if (current.screen != AuthScreen.Schedule &&
+                    current.screen != AuthScreen.Attendance &&
+                    current.serverStatus is ServerStatus.Available
+                ) {
                     _uiState.update { decideInitialScreen(it) }
                 }
             }
@@ -646,7 +674,7 @@ class LoginViewModel(
     }
 
     private fun decideInitialScreen(current: LoginUiState): LoginUiState {
-        if (current.screen == AuthScreen.Schedule) {
+        if (current.screen == AuthScreen.Schedule || current.screen == AuthScreen.Attendance) {
             return current
         }
         return if (current.serverStatus is ServerStatus.Available && !storedPinCode.isNullOrBlank() && !storedSessionKey.isNullOrBlank()) {
@@ -685,7 +713,8 @@ class LoginViewModel(
                 screen = AuthScreen.CreatePin,
                 pinSetup = "",
                 pinErrorMessage = null,
-                teacherName = teacherName ?: it.teacherName
+                teacherName = teacherName ?: it.teacherName,
+                currentLesson = null
             )
         }
     }
@@ -712,17 +741,20 @@ class LoginViewModel(
 
         return students
             .mapNotNull { student ->
-                val id = student.resolvedId ?: return@mapNotNull null
-                val name = student.resolvedName.ifBlank { "Ученик #$id" }
+                val courseGroupStudentId = student.courseGroupStudentId ?: student.studentId
+                if (courseGroupStudentId == null) {
+                    return@mapNotNull null
+                }
+                val name = student.resolvedName.ifBlank { "Ученик #$courseGroupStudentId" }
                 StudentAttendanceUi(
-                    id = id,
-                    studentId = student.studentId,
+                    courseGroupStudentId = courseGroupStudentId,
+                    studentId = student.studentId ?: courseGroupStudentId,
                     name = name,
                     visitId = student.visitId,
                     isPresent = student.isPresent
                 )
             }
-            .distinctBy { it.id }
+            .distinctBy { it.courseGroupStudentId }
             .sortedBy { it.name.lowercase(Locale.getDefault()) }
     }
 
@@ -741,6 +773,17 @@ class LoginViewModel(
             } else {
                 current
             }
+        }
+    }
+
+    fun backToScheduleFromAttendance() {
+        _uiState.update {
+            it.copy(
+                screen = AuthScreen.Schedule,
+                lessonDetails = LessonDetailsState.Hidden,
+                selectedLessonId = null,
+                currentLesson = null
+            )
         }
     }
 
