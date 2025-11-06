@@ -22,7 +22,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,8 +38,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.ui.semantics.Role
 import com.kubyshka.teacherworkspace.R
 import com.kubyshka.teacherworkspace.network.ScheduleItem
 
@@ -75,9 +73,15 @@ fun LoginRoute(viewModel: LoginViewModel) {
                 uiState = uiState,
                 onRefresh = viewModel::refreshSchedule,
                 onLogout = viewModel::logout,
-                onLessonClick = viewModel::onLessonSelected,
+                onLessonClick = viewModel::onLessonSelected
+            )
+
+            AuthScreen.Attendance -> AttendanceScreen(
+                attendanceState = uiState.lessonDetails,
+                currentLesson = uiState.currentLesson,
                 onToggleAttendance = viewModel::toggleStudentAttendance,
-                onSaveAttendance = viewModel::saveLessonAttendance
+                onSaveAttendance = viewModel::saveLessonAttendance,
+                onBackToSchedule = viewModel::backToScheduleFromAttendance
             )
         }
     }
@@ -356,9 +360,7 @@ private fun ScheduleScreen(
     uiState: LoginUiState,
     onRefresh: () -> Unit,
     onLogout: () -> Unit,
-    onLessonClick: (ScheduleItem) -> Unit,
-    onToggleAttendance: (Int) -> Unit,
-    onSaveAttendance: () -> Unit
+    onLessonClick: (ScheduleItem) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -455,12 +457,6 @@ private fun ScheduleScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LessonAttendanceSection(
-                        attendanceState = uiState.lessonDetails,
-                        onToggleAttendance = onToggleAttendance,
-                        onSaveAttendance = onSaveAttendance
-                    )
                 }
 
                 Button(
@@ -515,106 +511,154 @@ private fun ScheduleCard(
 }
 
 @Composable
-private fun LessonAttendanceSection(
+private fun AttendanceScreen(
     attendanceState: LessonDetailsState,
+    currentLesson: ScheduleItem?,
     onToggleAttendance: (Int) -> Unit,
-    onSaveAttendance: () -> Unit
+    onSaveAttendance: () -> Unit,
+    onBackToSchedule: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    val lessonForHeader = when (attendanceState) {
+        is LessonDetailsState.Loaded -> attendanceState.attendance.lesson
+        else -> currentLesson
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            when (attendanceState) {
-                LessonDetailsState.Hidden -> {
+        TextButton(onClick = onBackToSchedule) {
+            Text(text = stringResource(R.string.attendance_back_to_schedule))
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = stringResource(R.string.attendance_screen_title),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+
+        lessonForHeader?.let { lesson ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = lesson.courseName.orEmpty(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            lesson.courseGroupTitle?.takeIf { it.isNotBlank() }?.let { group ->
+                Text(
+                    text = group,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            Text(
+                text = buildLessonTime(lesson.time),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            lesson.classroomName?.takeIf { it.isNotBlank() }?.let { classroom ->
+                Text(
+                    text = classroom,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        when (attendanceState) {
+            LessonDetailsState.Hidden -> {
+                Text(
+                    text = stringResource(R.string.attendance_select_lesson_hint),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            LessonDetailsState.Loading -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator()
                     Text(
-                        text = stringResource(R.string.attendance_select_lesson_hint),
+                        text = stringResource(R.string.attendance_loading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
+            }
+
+            is LessonDetailsState.Error -> {
+                Text(
+                    text = attendanceState.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            is LessonDetailsState.Loaded -> {
+                val attendance = attendanceState.attendance
+                Text(
+                    text = attendance.dateLabel,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = stringResource(R.string.attendance_instruction),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (attendance.students.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.attendance_empty_students),
                         style = MaterialTheme.typography.bodyMedium
                     )
-                }
-
-                LessonDetailsState.Loading -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator()
-                        Text(
-                            text = stringResource(R.string.attendance_loading),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = 16.dp)
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
-                    }
-                }
-
-                is LessonDetailsState.Error -> {
-                    Text(
-                        text = attendanceState.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-
-                is LessonDetailsState.Loaded -> {
-                    val attendance = attendanceState.attendance
-                    Text(
-                        text = attendance.dateLabel,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = stringResource(R.string.attendance_instruction),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (attendance.students.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.attendance_empty_students),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    } else {
-                        attendance.students.forEach { student ->
-                            LessonStudentRow(
-                                student = student,
-                                onToggleAttendance = onToggleAttendance
-                            )
-                        }
-                    }
-
-                    attendance.saveError?.let { errorMessage ->
-                        Text(
-                            text = errorMessage,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
-
-                    if (attendance.isSaveSuccessful) {
-                        Text(
-                            text = stringResource(R.string.attendance_save_success),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
-
-                    Button(
-                        onClick = onSaveAttendance,
-                        enabled = attendance.students.isNotEmpty() && !attendance.isSaving,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp)
                     ) {
-                        if (attendance.isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            attendance.students.forEach { student ->
+                                AttendanceStudentRow(
+                                    student = student,
+                                    onToggleAttendance = onToggleAttendance
+                                )
+                            }
                         }
-                        Text(text = stringResource(R.string.attendance_save_button))
                     }
+                }
+
+                attendance.saveError?.let { errorMessage ->
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                }
+
+                Button(
+                    onClick = onSaveAttendance,
+                    enabled = attendance.students.isNotEmpty() && !attendance.isSaving,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 24.dp)
+                ) {
+                    if (attendance.isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(text = stringResource(R.string.attendance_save_button))
                 }
             }
         }
@@ -622,29 +666,27 @@ private fun LessonAttendanceSection(
 }
 
 @Composable
-private fun LessonStudentRow(
+private fun AttendanceStudentRow(
     student: StudentAttendanceUi,
     onToggleAttendance: (Int) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .selectable(
-                selected = student.isPresent,
-                onClick = { onToggleAttendance(student.id) },
-                role = Role.RadioButton
-            )
             .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RadioButton(
-            selected = student.isPresent,
-            onClick = { onToggleAttendance(student.id) }
-        )
         Text(
             text = student.name,
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(start = 12.dp)
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 16.dp)
+        )
+        Switch(
+            checked = student.isPresent,
+            onCheckedChange = { onToggleAttendance(student.courseGroupStudentId) }
         )
     }
 }

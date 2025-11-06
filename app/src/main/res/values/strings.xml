@@ -25,6 +25,8 @@
     <string name="schedule_loading">Загружаем расписание…</string>
     <string name="schedule_empty_message">На сегодня занятий нет.</string>
     <string name="schedule_refresh_button">Обновить расписание</string>
+    <string name="attendance_screen_title">Посещаемость</string>
+    <string name="attendance_back_to_schedule">К расписанию</string>
     <string name="attendance_select_lesson_hint">Выберите занятие, чтобы проставить посещения.</string>
     <string name="attendance_loading">Загружаем список учеников…</string>
     <string name="attendance_instruction">Проставьте посещения</string>
