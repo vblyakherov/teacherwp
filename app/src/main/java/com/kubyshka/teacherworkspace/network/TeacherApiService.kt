@@ -188,7 +188,7 @@ interface TeacherApiService {
     @POST("Schedule/Today")
     suspend fun getTodaySchedule(@Body request: ScheduleRequest): ScheduleResponse
 
-    @POST("Schedule/Students")
+    @POST("Schedule/LessonStudents")
     suspend fun getLessonStudents(@Body request: LessonStudentsRequest): LessonStudentsResponse
 
     @POST("Schedule/Visits/Save")
