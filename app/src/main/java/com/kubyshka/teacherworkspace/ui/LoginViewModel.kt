@@ -428,10 +428,9 @@ class LoginViewModel(
         }
 
         val visits = details.attendance.students.map { student ->
+            val studentId = student.studentId ?: student.courseGroupStudentId
             StudentAttendancePayload(
-                courseGroupStudentId = student.courseGroupStudentId,
-                studentId = student.studentId ?: student.courseGroupStudentId,
-                visitId = student.visitId,
+                studentId = studentId,
                 isVisited = student.isPresent
             )
         }
