@@ -47,7 +47,7 @@ class TeacherRepository(private val apiService: TeacherApiService) {
         sessionKey: String,
         groupScheduleId: Int,
         visits: List<StudentAttendancePayload>
-    ): ApiResponse {
+    ): LessonStudentsResponse {
         return apiService.saveLessonAttendance(
             SaveLessonAttendanceRequest(
                 sessionKey = sessionKey,

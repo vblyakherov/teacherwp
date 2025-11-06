@@ -457,8 +457,14 @@ class LoginViewModel(
             try {
                 val response = repository.saveLessonAttendance(sessionKey, lessonId, visits)
                 if (response.success) {
+                    val updatedStudents = mapStudentsForAttendance(response.data.orEmpty())
                     updateAttendanceForLesson(lessonId) {
-                        it.copy(isSaving = false, saveError = null, isSaveSuccessful = true)
+                        it.copy(
+                            students = updatedStudents,
+                            isSaving = false,
+                            saveError = null,
+                            isSaveSuccessful = true
+                        )
                     }
                     _uiState.update { current ->
                         current.copy(

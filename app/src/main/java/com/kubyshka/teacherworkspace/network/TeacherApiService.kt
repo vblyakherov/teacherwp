@@ -191,7 +191,7 @@ interface TeacherApiService {
     suspend fun getLessonStudents(@Body request: LessonStudentsRequest): LessonStudentsResponse
 
     @POST("Schedule/SaveVisits")
-    suspend fun saveLessonAttendance(@Body request: SaveLessonAttendanceRequest): ApiResponse
+    suspend fun saveLessonAttendance(@Body request: SaveLessonAttendanceRequest): LessonStudentsResponse
 }
 
 private val json = Json {
