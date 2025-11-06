@@ -1,5 +1,7 @@
 package com.kubyshka.teacherworkspace.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -18,6 +22,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,6 +38,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import com.kubyshka.teacherworkspace.R
 import com.kubyshka.teacherworkspace.network.ScheduleItem
 
@@ -67,7 +74,10 @@ fun LoginRoute(viewModel: LoginViewModel) {
             AuthScreen.Schedule -> ScheduleScreen(
                 uiState = uiState,
                 onRefresh = viewModel::refreshSchedule,
-                onLogout = viewModel::logout
+                onLogout = viewModel::logout,
+                onLessonClick = viewModel::onLessonSelected,
+                onToggleAttendance = viewModel::toggleStudentAttendance,
+                onSaveAttendance = viewModel::saveLessonAttendance
             )
         }
     }
@@ -345,7 +355,10 @@ private fun PinLoginScreen(
 private fun ScheduleScreen(
     uiState: LoginUiState,
     onRefresh: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onLessonClick: (ScheduleItem) -> Unit,
+    onToggleAttendance: (Int) -> Unit,
+    onSaveAttendance: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -431,10 +444,23 @@ private fun ScheduleScreen(
                     )
                 } else {
                     Spacer(modifier = Modifier.height(16.dp))
+                    val selectedLessonId = uiState.selectedLessonId
                     scheduleStatus.lessons.forEach { lesson ->
-                        ScheduleCard(lesson = lesson)
+                        val lessonId = lesson.groupScheduleId
+                        ScheduleCard(
+                            lesson = lesson,
+                            isSelected = lessonId != null && lessonId == selectedLessonId,
+                            onClick = { onLessonClick(lesson) }
+                        )
                         Spacer(modifier = Modifier.height(12.dp))
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LessonAttendanceSection(
+                        attendanceState = uiState.lessonDetails,
+                        onToggleAttendance = onToggleAttendance,
+                        onSaveAttendance = onSaveAttendance
+                    )
                 }
 
                 Button(
@@ -451,10 +477,17 @@ private fun ScheduleScreen(
 }
 
 @Composable
-private fun ScheduleCard(lesson: ScheduleItem) {
+private fun ScheduleCard(
+    lesson: ScheduleItem,
+    isSelected: Boolean,
+    onClick: (ScheduleItem) -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick(lesson) },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
@@ -478,6 +511,141 @@ private fun ScheduleCard(lesson: ScheduleItem) {
                 modifier = Modifier.padding(top = 4.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun LessonAttendanceSection(
+    attendanceState: LessonDetailsState,
+    onToggleAttendance: (Int) -> Unit,
+    onSaveAttendance: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            when (attendanceState) {
+                LessonDetailsState.Hidden -> {
+                    Text(
+                        text = stringResource(R.string.attendance_select_lesson_hint),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                LessonDetailsState.Loading -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = stringResource(R.string.attendance_loading),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 16.dp)
+                        )
+                    }
+                }
+
+                is LessonDetailsState.Error -> {
+                    Text(
+                        text = attendanceState.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                is LessonDetailsState.Loaded -> {
+                    val attendance = attendanceState.attendance
+                    Text(
+                        text = attendance.dateLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = stringResource(R.string.attendance_instruction),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (attendance.students.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.attendance_empty_students),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    } else {
+                        attendance.students.forEach { student ->
+                            LessonStudentRow(
+                                student = student,
+                                onToggleAttendance = onToggleAttendance
+                            )
+                        }
+                    }
+
+                    attendance.saveError?.let { errorMessage ->
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    if (attendance.isSaveSuccessful) {
+                        Text(
+                            text = stringResource(R.string.attendance_save_success),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    Button(
+                        onClick = onSaveAttendance,
+                        enabled = attendance.students.isNotEmpty() && !attendance.isSaving,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp)
+                    ) {
+                        if (attendance.isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(text = stringResource(R.string.attendance_save_button))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LessonStudentRow(
+    student: StudentAttendanceUi,
+    onToggleAttendance: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(
+                selected = student.isPresent,
+                onClick = { onToggleAttendance(student.id) },
+                role = Role.RadioButton
+            )
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = student.isPresent,
+            onClick = { onToggleAttendance(student.id) }
+        )
+        Text(
+            text = student.name,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(start = 12.dp)
+        )
     }
 }
 

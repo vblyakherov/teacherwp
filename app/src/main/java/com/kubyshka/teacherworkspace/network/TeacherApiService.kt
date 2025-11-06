@@ -122,6 +122,62 @@ data class ScheduleItem(
     val coachId: Int? get() = coachIdValue ?: couchIdValue
 }
 
+@Serializable
+data class LessonStudentsRequest(
+    @SerialName("session_key") val sessionKey: String,
+    @SerialName("group_schedule_id") val groupScheduleId: Int
+)
+
+@Serializable
+data class LessonStudentsResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val data: List<LessonStudent>? = null
+)
+
+@Serializable
+data class LessonStudent(
+    @SerialName("course_group_student_id") val courseGroupStudentId: Int? = null,
+    @SerialName("student_id") val studentId: Int? = null,
+    @SerialName("student_name") val studentName: String? = null,
+    @SerialName("student_full_name") val studentFullName: String? = null,
+    @SerialName("student_fio") val studentFio: String? = null,
+    @SerialName("visit_id") val visitId: Int? = null,
+    @SerialName("visit") val visit: Int? = null,
+    @SerialName("visit_state") val visitState: Int? = null,
+    @SerialName("visit_present") val visitPresent: Int? = null
+) {
+    val resolvedId: Int?
+        get() = courseGroupStudentId ?: studentId
+
+    val resolvedName: String
+        get() = studentFullName
+            ?: studentFio
+            ?: studentName
+            ?: ""
+
+    val isPresent: Boolean
+        get() {
+            val state = visitPresent ?: visitState ?: visit
+            return state != 0
+        }
+}
+
+@Serializable
+data class SaveLessonAttendanceRequest(
+    @SerialName("session_key") val sessionKey: String,
+    @SerialName("group_schedule_id") val groupScheduleId: Int,
+    @SerialName("visits") val visits: List<StudentAttendancePayload>
+)
+
+@Serializable
+data class StudentAttendancePayload(
+    @SerialName("course_group_student_id") val courseGroupStudentId: Int,
+    @SerialName("student_id") val studentId: Int? = null,
+    @SerialName("visit_id") val visitId: Int? = null,
+    @SerialName("visit_present") val visitPresent: Int
+)
+
 interface TeacherApiService {
     @GET("Ping")
     suspend fun ping(): ApiResponse
@@ -131,6 +187,12 @@ interface TeacherApiService {
 
     @POST("Schedule/Today")
     suspend fun getTodaySchedule(@Body request: ScheduleRequest): ScheduleResponse
+
+    @POST("Schedule/Students")
+    suspend fun getLessonStudents(@Body request: LessonStudentsRequest): LessonStudentsResponse
+
+    @POST("Schedule/Visits/Save")
+    suspend fun saveLessonAttendance(@Body request: SaveLessonAttendanceRequest): ApiResponse
 }
 
 private val json = Json {
