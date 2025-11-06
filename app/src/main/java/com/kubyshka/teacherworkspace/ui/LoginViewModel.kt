@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.kubyshka.teacherworkspace.data.SessionManager
 import com.kubyshka.teacherworkspace.data.TeacherRepository
 import com.kubyshka.teacherworkspace.network.ApiResponse
+import com.kubyshka.teacherworkspace.network.LessonStudent
 import com.kubyshka.teacherworkspace.network.LoginResponse
 import com.kubyshka.teacherworkspace.network.ScheduleItem
+import com.kubyshka.teacherworkspace.network.StudentAttendancePayload
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,6 +51,30 @@ sealed interface ScheduleStatus {
     data class Success(val displayDate: String, val lessons: List<ScheduleItem>) : ScheduleStatus
 }
 
+sealed interface LessonDetailsState {
+    object Hidden : LessonDetailsState
+    object Loading : LessonDetailsState
+    data class Error(val message: String) : LessonDetailsState
+    data class Loaded(val attendance: LessonAttendanceUiState) : LessonDetailsState
+}
+
+data class LessonAttendanceUiState(
+    val lesson: ScheduleItem,
+    val dateLabel: String,
+    val students: List<StudentAttendanceUi>,
+    val isSaving: Boolean = false,
+    val saveError: String? = null,
+    val isSaveSuccessful: Boolean = false
+)
+
+data class StudentAttendanceUi(
+    val id: Int,
+    val studentId: Int?,
+    val name: String,
+    val visitId: Int?,
+    val isPresent: Boolean
+)
+
 data class LoginUiState(
     val username: String = "",
     val password: String = "",
@@ -59,6 +85,8 @@ data class LoginUiState(
     val serverStatus: ServerStatus = ServerStatus.Checking,
     val screen: AuthScreen = AuthScreen.Credentials,
     val scheduleStatus: ScheduleStatus = ScheduleStatus.Idle,
+    val lessonDetails: LessonDetailsState = LessonDetailsState.Hidden,
+    val selectedLessonId: Int? = null,
     val teacherName: String? = null,
     val pinAttemptsLeft: Int = MAX_PIN_ATTEMPTS
 )
@@ -256,6 +284,208 @@ class LoginViewModel(
         loadSchedule()
     }
 
+    fun onLessonSelected(lesson: ScheduleItem) {
+        val lessonId = lesson.groupScheduleId
+        if (lessonId == null) {
+            _uiState.update {
+                it.copy(
+                    lessonDetails = LessonDetailsState.Error(
+                        "Не удалось определить выбранное занятие"
+                    ),
+                    selectedLessonId = null
+                )
+            }
+            return
+        }
+
+        val sessionKey = storedSessionKey
+        if (sessionKey.isNullOrBlank()) {
+            clearPinAndReturnToCredentials()
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                selectedLessonId = lessonId,
+                lessonDetails = LessonDetailsState.Loading
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                val response = repository.getLessonStudents(sessionKey, lessonId)
+                if (response.success) {
+                    val students = mapStudentsForAttendance(response.data.orEmpty())
+                    val dateLabel = buildLessonDateLabel(lesson)
+                    _uiState.update { current ->
+                        current.copy(
+                            lessonDetails = LessonDetailsState.Loaded(
+                                LessonAttendanceUiState(
+                                    lesson = lesson,
+                                    dateLabel = dateLabel,
+                                    students = students
+                                )
+                            )
+                        )
+                    }
+                } else {
+                    val message = response.message?.takeIf { it.isNotBlank() }
+                        ?: "Не удалось загрузить список учеников"
+                    _uiState.update {
+                        it.copy(
+                            lessonDetails = LessonDetailsState.Error(message)
+                        )
+                    }
+                }
+            } catch (exception: HttpException) {
+                val message = parseServerError(exception)
+                _uiState.update {
+                    it.copy(lessonDetails = LessonDetailsState.Error(message))
+                }
+            } catch (exception: IOException) {
+                _uiState.update {
+                    it.copy(
+                        lessonDetails = LessonDetailsState.Error(
+                            "Проверьте подключение к интернету и попробуйте ещё раз"
+                        )
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        lessonDetails = LessonDetailsState.Error(
+                            exception.localizedMessage ?: "Неизвестная ошибка"
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun toggleStudentAttendance(studentId: Int) {
+        _uiState.update { current ->
+            val details = current.lessonDetails
+            if (details !is LessonDetailsState.Loaded || details.attendance.isSaving) {
+                return@update current
+            }
+
+            var toggled = false
+            val updatedStudents = details.attendance.students.map { student ->
+                if (student.id == studentId) {
+                    toggled = true
+                    student.copy(isPresent = !student.isPresent)
+                } else {
+                    student
+                }
+            }
+
+            if (!toggled) {
+                return@update current
+            }
+
+            current.copy(
+                lessonDetails = LessonDetailsState.Loaded(
+                    details.attendance.copy(
+                        students = updatedStudents,
+                        saveError = null,
+                        isSaveSuccessful = false
+                    )
+                )
+            )
+        }
+    }
+
+    fun saveLessonAttendance() {
+        val details = _uiState.value.lessonDetails
+        if (details !is LessonDetailsState.Loaded || details.attendance.isSaving) {
+            return
+        }
+
+        val lessonId = details.attendance.lesson.groupScheduleId
+        if (lessonId == null) {
+            _uiState.update {
+                it.copy(
+                    lessonDetails = LessonDetailsState.Error(
+                        "Не удалось определить выбранное занятие"
+                    ),
+                    selectedLessonId = null
+                )
+            }
+            return
+        }
+
+        val sessionKey = storedSessionKey
+        if (sessionKey.isNullOrBlank()) {
+            clearPinAndReturnToCredentials()
+            return
+        }
+
+        val visits = details.attendance.students.map { student ->
+            StudentAttendancePayload(
+                courseGroupStudentId = student.id,
+                studentId = student.studentId,
+                visitId = student.visitId,
+                visitPresent = if (student.isPresent) 1 else 0
+            )
+        }
+
+        if (visits.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    lessonDetails = LessonDetailsState.Loaded(
+                        details.attendance.copy(
+                            saveError = "Нет учеников для сохранения",
+                            isSaveSuccessful = false
+                        )
+                    )
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            updateAttendanceForLesson(lessonId) {
+                it.copy(isSaving = true, saveError = null, isSaveSuccessful = false)
+            }
+
+            try {
+                val response = repository.saveLessonAttendance(sessionKey, lessonId, visits)
+                if (response.success) {
+                    updateAttendanceForLesson(lessonId) {
+                        it.copy(isSaving = false, saveError = null, isSaveSuccessful = true)
+                    }
+                } else {
+                    val message = response.message?.takeIf { it.isNotBlank() }
+                        ?: "Не удалось сохранить посещения"
+                    updateAttendanceForLesson(lessonId) {
+                        it.copy(isSaving = false, saveError = message, isSaveSuccessful = false)
+                    }
+                }
+            } catch (exception: HttpException) {
+                val message = parseServerError(exception)
+                updateAttendanceForLesson(lessonId) {
+                    it.copy(isSaving = false, saveError = message, isSaveSuccessful = false)
+                }
+            } catch (exception: IOException) {
+                updateAttendanceForLesson(lessonId) {
+                    it.copy(
+                        isSaving = false,
+                        saveError = "Проверьте подключение к интернету и попробуйте ещё раз",
+                        isSaveSuccessful = false
+                    )
+                }
+            } catch (exception: Exception) {
+                updateAttendanceForLesson(lessonId) {
+                    it.copy(
+                        isSaving = false,
+                        saveError = exception.localizedMessage ?: "Неизвестная ошибка",
+                        isSaveSuccessful = false
+                    )
+                }
+            }
+        }
+    }
+
     fun logout() {
         viewModelScope.launch {
             sessionManager.clearAll()
@@ -272,6 +502,8 @@ class LoginViewModel(
                     status = LoginStatus.Idle,
                     pinErrorMessage = null,
                     scheduleStatus = ScheduleStatus.Idle,
+                    lessonDetails = LessonDetailsState.Hidden,
+                    selectedLessonId = null,
                     pinAttemptsLeft = MAX_PIN_ATTEMPTS,
                     teacherName = null
                 )
@@ -299,7 +531,13 @@ class LoginViewModel(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(scheduleStatus = ScheduleStatus.Loading) }
+            _uiState.update {
+                it.copy(
+                    scheduleStatus = ScheduleStatus.Loading,
+                    lessonDetails = LessonDetailsState.Hidden,
+                    selectedLessonId = null
+                )
+            }
             try {
                 val response = repository.getTodaySchedule(sessionKey, coachId)
                 if (response.success) {
@@ -314,20 +552,30 @@ class LoginViewModel(
                     val message = response.message?.takeIf { it.isNotBlank() }
                         ?: "Не удалось получить расписание"
                     _uiState.update {
-                        it.copy(scheduleStatus = ScheduleStatus.Error(message))
+                        it.copy(
+                            scheduleStatus = ScheduleStatus.Error(message),
+                            lessonDetails = LessonDetailsState.Hidden,
+                            selectedLessonId = null
+                        )
                     }
                 }
             } catch (exception: HttpException) {
                 val message = parseServerError(exception)
                 _uiState.update {
-                    it.copy(scheduleStatus = ScheduleStatus.Error(message))
+                    it.copy(
+                        scheduleStatus = ScheduleStatus.Error(message),
+                        lessonDetails = LessonDetailsState.Hidden,
+                        selectedLessonId = null
+                    )
                 }
             } catch (exception: IOException) {
                 _uiState.update {
                     it.copy(
                         scheduleStatus = ScheduleStatus.Error(
                             "Проверьте подключение к интернету и попробуйте ещё раз"
-                        )
+                        ),
+                        lessonDetails = LessonDetailsState.Hidden,
+                        selectedLessonId = null
                     )
                 }
             } catch (exception: Exception) {
@@ -335,7 +583,9 @@ class LoginViewModel(
                     it.copy(
                         scheduleStatus = ScheduleStatus.Error(
                             exception.localizedMessage ?: "Неизвестная ошибка"
-                        )
+                        ),
+                        lessonDetails = LessonDetailsState.Hidden,
+                        selectedLessonId = null
                     )
                 }
             }
@@ -359,6 +609,8 @@ class LoginViewModel(
                     screen = AuthScreen.Credentials,
                     pinAttemptsLeft = MAX_PIN_ATTEMPTS,
                     scheduleStatus = ScheduleStatus.Idle,
+                    lessonDetails = LessonDetailsState.Hidden,
+                    selectedLessonId = null,
                     status = LoginStatus.Idle,
                     teacherName = null
                 )
@@ -444,6 +696,52 @@ class LoginViewModel(
         val daySource = lessons.firstOrNull { !it.date.isNullOrBlank() }?.date
         val date = runCatching { daySource?.let { formatter.parse(it) } }.getOrNull() ?: Date()
         return displayFormatter.format(date)
+    }
+
+    private fun buildLessonDateLabel(lesson: ScheduleItem): String {
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val displayFormatter = SimpleDateFormat("d MMMM yyyy", Locale.getDefault())
+        val date = runCatching { lesson.date?.let { formatter.parse(it) } }.getOrNull() ?: Date()
+        return displayFormatter.format(date)
+    }
+
+    private fun mapStudentsForAttendance(students: List<LessonStudent>): List<StudentAttendanceUi> {
+        if (students.isEmpty()) {
+            return emptyList()
+        }
+
+        return students
+            .mapNotNull { student ->
+                val id = student.resolvedId ?: return@mapNotNull null
+                val name = student.resolvedName.ifBlank { "Ученик #$id" }
+                StudentAttendanceUi(
+                    id = id,
+                    studentId = student.studentId,
+                    name = name,
+                    visitId = student.visitId,
+                    isPresent = student.isPresent
+                )
+            }
+            .distinctBy { it.id }
+            .sortedBy { it.name.lowercase(Locale.getDefault()) }
+    }
+
+    private fun updateAttendanceForLesson(
+        lessonId: Int,
+        transformer: (LessonAttendanceUiState) -> LessonAttendanceUiState
+    ) {
+        _uiState.update { current ->
+            val details = current.lessonDetails
+            if (details is LessonDetailsState.Loaded &&
+                details.attendance.lesson.groupScheduleId == lessonId
+            ) {
+                current.copy(
+                    lessonDetails = LessonDetailsState.Loaded(transformer(details.attendance))
+                )
+            } else {
+                current
+            }
+        }
     }
 
     private fun prepareLessonsForDisplay(lessons: List<ScheduleItem>): List<ScheduleItem> {
