@@ -3,6 +3,11 @@ package com.kubyshka.teacherworkspace.network
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -145,7 +150,8 @@ data class LessonStudent(
     @SerialName("visit_id") val visitId: Int? = null,
     @SerialName("visit") val visit: Int? = null,
     @SerialName("visit_state") val visitState: Int? = null,
-    @SerialName("visit_present") val visitPresent: Int? = null
+    @SerialName("visit_present") val visitPresent: Int? = null,
+    @SerialName("is_visited") val isVisitedRaw: JsonElement? = null
 ) {
     val resolvedId: Int?
         get() = courseGroupStudentId ?: studentId
@@ -158,9 +164,22 @@ data class LessonStudent(
 
     val isPresent: Boolean
         get() {
+            parseIsVisitedFlag()?.let { return it }
             val state = visitPresent ?: visitState ?: visit
             return state?.let { it != 0 } ?: false
         }
+
+    private fun parseIsVisitedFlag(): Boolean? {
+        val primitive = isVisitedRaw as? JsonPrimitive ?: return null
+        primitive.booleanOrNull?.let { return it }
+        primitive.intOrNull?.let { return it != 0 }
+        val content = primitive.contentOrNull?.trim()?.lowercase()
+        return when (content) {
+            "1", "true", "yes" -> true
+            "0", "false", "no" -> false
+            else -> null
+        }
+    }
 }
 
 @Serializable
