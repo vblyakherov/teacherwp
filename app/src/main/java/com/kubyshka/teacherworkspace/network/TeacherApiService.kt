@@ -159,7 +159,7 @@ data class LessonStudent(
     val isPresent: Boolean
         get() {
             val state = visitPresent ?: visitState ?: visit
-            return state != 0
+            return state?.let { it != 0 } ?: false
         }
 }
 
