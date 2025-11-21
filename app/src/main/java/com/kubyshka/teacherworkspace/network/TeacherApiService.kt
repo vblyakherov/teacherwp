@@ -15,6 +15,7 @@ import retrofit2.Retrofit
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.POST
 
 private const val API_BASE_URL = "https://piggybank.torpedovrn.ru/Api/"
@@ -22,7 +23,8 @@ private const val API_BASE_URL = "https://piggybank.torpedovrn.ru/Api/"
 @Serializable
 data class ApiResponse(
     val success: Boolean,
-    val message: String? = null
+    val message: String? = null,
+    val update: UpdateInfo? = null
 )
 
 @Serializable
@@ -40,6 +42,13 @@ data class LoginResponse(
     @SerialName("coach") val coach: Coach? = null,
     @SerialName("couch") val couch: Coach? = null,
     val school: School? = null
+)
+
+@Serializable
+data class UpdateInfo(
+    @SerialName("has_update") val hasUpdate: Boolean = false,
+    val version: String? = null,
+    val url: String? = null
 )
 
 @Serializable
@@ -197,6 +206,7 @@ data class StudentAttendancePayload(
 )
 
 interface TeacherApiService {
+    @Headers("User-Agent: teacherwp/1.0")
     @GET("Ping")
     suspend fun ping(): ApiResponse
 

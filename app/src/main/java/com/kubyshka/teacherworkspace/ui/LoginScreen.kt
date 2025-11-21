@@ -1,5 +1,6 @@
 package com.kubyshka.teacherworkspace.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -38,12 +40,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.kubyshka.teacherworkspace.R
 import com.kubyshka.teacherworkspace.network.ScheduleItem
 
 @Composable
 fun LoginRoute(viewModel: LoginViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(uiState.updateAvailable) {
+        if (uiState.updateAvailable) {
+            Toast.makeText(context, "есть обновление!", Toast.LENGTH_LONG).show()
+        }
+    }
 
     Surface(modifier = Modifier.fillMaxSize()) {
         when (uiState.screen) {
