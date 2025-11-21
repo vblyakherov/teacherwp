@@ -90,7 +90,8 @@ data class LoginUiState(
     val selectedLessonId: Int? = null,
     val currentLesson: ScheduleItem? = null,
     val teacherName: String? = null,
-    val pinAttemptsLeft: Int = MAX_PIN_ATTEMPTS
+    val pinAttemptsLeft: Int = MAX_PIN_ATTEMPTS,
+    val updateAvailable: Boolean = false
 )
 
 class LoginViewModel(
@@ -135,8 +136,12 @@ class LoginViewModel(
             try {
                 val response = repository.ping()
                 if (response.success) {
+                    val hasUpdate = response.update?.hasUpdate == true
                     _uiState.update { current ->
-                        val updated = current.copy(serverStatus = ServerStatus.Available)
+                        val updated = current.copy(
+                            serverStatus = ServerStatus.Available,
+                            updateAvailable = hasUpdate
+                        )
                         decideInitialScreen(updated)
                     }
                 } else {
