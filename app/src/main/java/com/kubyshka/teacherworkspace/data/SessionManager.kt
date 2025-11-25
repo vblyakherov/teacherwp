@@ -14,10 +14,15 @@ private val Context.dataStore by preferencesDataStore(name = SESSION_PREFERENCES
 
 class SessionManager(private val context: Context) {
 
+    companion object {
+        const val DEFAULT_APP_VERSION = "1.0"
+    }
+
     private val sessionKey = stringPreferencesKey("session_key")
     private val pinCode = stringPreferencesKey("pin_code")
     private val teacherName = stringPreferencesKey("teacher_name")
     private val coachId = intPreferencesKey("coach_id")
+    private val appVersion = stringPreferencesKey("app_version")
 
     val sessionKeyFlow: Flow<String?> = context.dataStore.data.map { preferences: Preferences ->
         preferences[sessionKey]
@@ -33,6 +38,10 @@ class SessionManager(private val context: Context) {
 
     val coachIdFlow: Flow<Int?> = context.dataStore.data.map { preferences: Preferences ->
         preferences[coachId]
+    }
+
+    val appVersionFlow: Flow<String> = context.dataStore.data.map { preferences: Preferences ->
+        preferences[appVersion] ?: DEFAULT_APP_VERSION
     }
 
     suspend fun saveSessionKey(value: String) {
@@ -56,6 +65,12 @@ class SessionManager(private val context: Context) {
     suspend fun saveCoachId(value: Int) {
         context.dataStore.edit { preferences ->
             preferences[coachId] = value
+        }
+    }
+
+    suspend fun saveAppVersion(value: String) {
+        context.dataStore.edit { preferences ->
+            preferences[appVersion] = value
         }
     }
 
