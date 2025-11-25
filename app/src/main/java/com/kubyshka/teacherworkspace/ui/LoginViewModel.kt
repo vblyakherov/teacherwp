@@ -93,7 +93,9 @@ data class LoginUiState(
     val pinAttemptsLeft: Int = MAX_PIN_ATTEMPTS,
     val updateAvailable: Boolean = false,
     val updateUrl: String? = null,
-    val isUpdating: Boolean = false
+    val isUpdating: Boolean = false,
+    val hasAttemptedUpdate: Boolean = false,
+    val updateErrorMessage: String? = null
 )
 
 class LoginViewModel(
@@ -145,7 +147,9 @@ class LoginViewModel(
                             serverStatus = ServerStatus.Available,
                             updateAvailable = hasUpdate && updateUrl != null,
                             updateUrl = updateUrl,
-                            isUpdating = if (hasUpdate) current.isUpdating else false
+                            isUpdating = if (hasUpdate) current.isUpdating else false,
+                            hasAttemptedUpdate = if (hasUpdate) current.hasAttemptedUpdate else false,
+                            updateErrorMessage = if (hasUpdate) current.updateErrorMessage else null
                         )
                         decideInitialScreen(updated)
                     }
@@ -225,16 +229,25 @@ class LoginViewModel(
         }
     }
 
-    fun onUpdateStarted() {
-        _uiState.update { it.copy(isUpdating = true) }
+    fun onUpdateRequested() {
+        _uiState.update {
+            it.copy(
+                isUpdating = true,
+                hasAttemptedUpdate = true,
+                updateErrorMessage = null
+            )
+        }
     }
 
-    fun onUpdateFailed() {
+    fun onUpdateCompleted() {
+        _uiState.update { it.copy(isUpdating = false, updateErrorMessage = null) }
+    }
+
+    fun onUpdateFailed(message: String?) {
         _uiState.update {
             it.copy(
                 isUpdating = false,
-                updateAvailable = false,
-                updateUrl = null
+                updateErrorMessage = message
             )
         }
     }

@@ -63,10 +63,21 @@ fun LoginRoute(viewModel: LoginViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    LaunchedEffect(uiState.updateAvailable) {
+    LaunchedEffect(uiState.updateAvailable, uiState.hasAttemptedUpdate) {
         val updateUrl = uiState.updateUrl
-        if (uiState.updateAvailable && !uiState.isUpdating && !updateUrl.isNullOrBlank()) {
-            viewModel.onUpdateStarted()
+        if (uiState.updateAvailable && !uiState.hasAttemptedUpdate && !updateUrl.isNullOrBlank()) {
+            viewModel.onUpdateRequested()
+        }
+    }
+
+    LaunchedEffect(uiState.isUpdating) {
+        if (uiState.isUpdating) {
+            val updateUrl = uiState.updateUrl
+            if (updateUrl.isNullOrBlank()) {
+                viewModel.onUpdateFailed(context.getString(R.string.update_failed))
+                return@LaunchedEffect
+            }
+
             Toast.makeText(
                 context,
                 context.getString(R.string.update_downloading),
@@ -74,54 +85,122 @@ fun LoginRoute(viewModel: LoginViewModel) {
             ).show()
 
             val result = runCatching { downloadAndInstallApk(context, updateUrl) }
-            if (result.isFailure) {
+            if (result.isSuccess) {
+                viewModel.onUpdateCompleted()
+            } else {
                 Toast.makeText(
                     context,
                     context.getString(R.string.update_failed),
                     Toast.LENGTH_LONG
                 ).show()
-                viewModel.onUpdateFailed()
+                viewModel.onUpdateFailed(context.getString(R.string.update_failed))
             }
         }
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        when (uiState.screen) {
-            AuthScreen.Credentials -> CredentialsScreen(
+        if (uiState.updateAvailable) {
+            UpdateRequiredScreen(
                 uiState = uiState,
-                onUsernameChanged = viewModel::onUsernameChanged,
-                onPasswordChanged = viewModel::onPasswordChanged,
-                onLoginClick = viewModel::login,
-                onRetryConnectionCheck = viewModel::checkServerAvailability
+                onInstallClick = viewModel::onUpdateRequested
             )
+        } else {
+            when (uiState.screen) {
+                AuthScreen.Credentials -> CredentialsScreen(
+                    uiState = uiState,
+                    onUsernameChanged = viewModel::onUsernameChanged,
+                    onPasswordChanged = viewModel::onPasswordChanged,
+                    onLoginClick = viewModel::login,
+                    onRetryConnectionCheck = viewModel::checkServerAvailability
+                )
 
-            AuthScreen.CreatePin -> PinCreationScreen(
-                uiState = uiState,
-                onPinChanged = viewModel::onPinSetupChanged,
-                onSavePin = viewModel::createPin,
-                onLogout = viewModel::logout
+                AuthScreen.CreatePin -> PinCreationScreen(
+                    uiState = uiState,
+                    onPinChanged = viewModel::onPinSetupChanged,
+                    onSavePin = viewModel::createPin,
+                    onLogout = viewModel::logout
+                )
+
+                AuthScreen.EnterPin -> PinLoginScreen(
+                    uiState = uiState,
+                    onPinChanged = viewModel::onPinInputChanged,
+                    onSubmit = viewModel::submitPin,
+                    onLoginWithPassword = viewModel::logout
+                )
+
+                AuthScreen.Schedule -> ScheduleScreen(
+                    uiState = uiState,
+                    onRefresh = viewModel::refreshSchedule,
+                    onLogout = viewModel::logout,
+                    onLessonClick = viewModel::onLessonSelected
+                )
+
+                AuthScreen.Attendance -> AttendanceScreen(
+                    attendanceState = uiState.lessonDetails,
+                    currentLesson = uiState.currentLesson,
+                    onToggleAttendance = viewModel::toggleStudentAttendance,
+                    onSaveAttendance = viewModel::saveLessonAttendance,
+                    onBackToSchedule = viewModel::backToScheduleFromAttendance
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateRequiredScreen(
+    uiState: LoginUiState,
+    onInstallClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = stringResource(id = R.string.update_required_title),
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        Text(
+            text = stringResource(id = R.string.update_required_description),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        if (uiState.updateErrorMessage != null) {
+            Text(
+                text = uiState.updateErrorMessage,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 16.dp)
             )
+        }
 
-            AuthScreen.EnterPin -> PinLoginScreen(
-                uiState = uiState,
-                onPinChanged = viewModel::onPinInputChanged,
-                onSubmit = viewModel::submitPin,
-                onLoginWithPassword = viewModel::logout
-            )
+        Button(
+            onClick = onInstallClick,
+            enabled = !uiState.isUpdating
+        ) {
+            if (uiState.isUpdating) {
+                CircularProgressIndicator(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(text = stringResource(id = R.string.update_required_button))
+            }
+        }
 
-            AuthScreen.Schedule -> ScheduleScreen(
-                uiState = uiState,
-                onRefresh = viewModel::refreshSchedule,
-                onLogout = viewModel::logout,
-                onLessonClick = viewModel::onLessonSelected
-            )
-
-            AuthScreen.Attendance -> AttendanceScreen(
-                attendanceState = uiState.lessonDetails,
-                currentLesson = uiState.currentLesson,
-                onToggleAttendance = viewModel::toggleStudentAttendance,
-                onSaveAttendance = viewModel::saveLessonAttendance,
-                onBackToSchedule = viewModel::backToScheduleFromAttendance
+        if (uiState.isUpdating) {
+            Text(
+                text = stringResource(id = R.string.update_in_progress),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 16.dp)
             )
         }
     }

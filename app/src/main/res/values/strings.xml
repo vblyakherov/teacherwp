@@ -35,4 +35,8 @@
     <string name="attendance_save_success">Посещения сохранены</string>
     <string name="update_downloading">Доступно обновление, скачиваем новую версию…</string>
     <string name="update_failed">Не удалось обновить приложение. Попробуйте ещё раз позже.</string>
+    <string name="update_required_title">Доступно обязательное обновление</string>
+    <string name="update_required_description">Установите последнюю версию, чтобы продолжить пользоваться приложением.</string>
+    <string name="update_required_button">Установить обновление</string>
+    <string name="update_in_progress">Устанавливаем обновление…</string>
 </resources>
