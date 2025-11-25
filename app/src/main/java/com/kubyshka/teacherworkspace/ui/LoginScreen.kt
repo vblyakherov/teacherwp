@@ -1,5 +1,9 @@
 package com.kubyshka.teacherworkspace.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Environment
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -33,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -40,9 +45,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import com.kubyshka.teacherworkspace.R
 import com.kubyshka.teacherworkspace.network.ScheduleItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+
+private val updateDownloadClient = OkHttpClient()
 
 @Composable
 fun LoginRoute(viewModel: LoginViewModel) {
@@ -50,8 +64,24 @@ fun LoginRoute(viewModel: LoginViewModel) {
     val context = LocalContext.current
 
     LaunchedEffect(uiState.updateAvailable) {
-        if (uiState.updateAvailable) {
-            Toast.makeText(context, "есть обновление!", Toast.LENGTH_LONG).show()
+        val updateUrl = uiState.updateUrl
+        if (uiState.updateAvailable && !uiState.isUpdating && !updateUrl.isNullOrBlank()) {
+            viewModel.onUpdateStarted()
+            Toast.makeText(
+                context,
+                context.getString(R.string.update_downloading),
+                Toast.LENGTH_LONG
+            ).show()
+
+            val result = runCatching { downloadAndInstallApk(context, updateUrl) }
+            if (result.isFailure) {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.update_failed),
+                    Toast.LENGTH_LONG
+                ).show()
+                viewModel.onUpdateFailed()
+            }
         }
     }
 
@@ -709,4 +739,38 @@ private fun buildLessonTime(rawTime: String?): String {
     } else {
         rawTime
     }
+}
+
+private suspend fun downloadAndInstallApk(context: Context, url: String) {
+    val fileName = url.substringAfterLast('/').takeIf { it.isNotBlank() } ?: "update.apk"
+    val destination = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        ?: context.filesDir
+    val apkFile = File(destination, fileName)
+
+    withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(url).build()
+        updateDownloadClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("Failed to download update: ${response.code}")
+            }
+            val body = response.body ?: throw IOException("Empty update body")
+            FileOutputStream(apkFile).use { output ->
+                body.byteStream().use { input -> input.copyTo(output) }
+            }
+        }
+    }
+
+    val apkUri: Uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        apkFile
+    )
+
+    val installIntent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(apkUri, "application/vnd.android.package-archive")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    context.startActivity(installIntent)
 }

@@ -91,7 +91,9 @@ data class LoginUiState(
     val currentLesson: ScheduleItem? = null,
     val teacherName: String? = null,
     val pinAttemptsLeft: Int = MAX_PIN_ATTEMPTS,
-    val updateAvailable: Boolean = false
+    val updateAvailable: Boolean = false,
+    val updateUrl: String? = null,
+    val isUpdating: Boolean = false
 )
 
 class LoginViewModel(
@@ -137,10 +139,13 @@ class LoginViewModel(
                 val response = repository.ping()
                 if (response.success) {
                     val hasUpdate = response.update?.hasUpdate == true
+                    val updateUrl = response.update?.url?.takeIf { it.isNotBlank() }
                     _uiState.update { current ->
                         val updated = current.copy(
                             serverStatus = ServerStatus.Available,
-                            updateAvailable = hasUpdate
+                            updateAvailable = hasUpdate && updateUrl != null,
+                            updateUrl = updateUrl,
+                            isUpdating = if (hasUpdate) current.isUpdating else false
                         )
                         decideInitialScreen(updated)
                     }
@@ -217,6 +222,20 @@ class LoginViewModel(
                     )
                 }
             }
+        }
+    }
+
+    fun onUpdateStarted() {
+        _uiState.update { it.copy(isUpdating = true) }
+    }
+
+    fun onUpdateFailed() {
+        _uiState.update {
+            it.copy(
+                isUpdating = false,
+                updateAvailable = false,
+                updateUrl = null
+            )
         }
     }
 
