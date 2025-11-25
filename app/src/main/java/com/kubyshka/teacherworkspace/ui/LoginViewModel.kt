@@ -110,6 +110,8 @@ class LoginViewModel(
     private var storedSessionKey: String? = null
     private var storedPinCode: String? = null
     private var storedCoachId: Int? = null
+    private var storedAppVersion: String = SessionManager.DEFAULT_APP_VERSION
+    private var availableUpdateVersion: String? = null
 
     init {
         observeStoredData()
@@ -141,15 +143,19 @@ class LoginViewModel(
                 val response = repository.ping()
                 if (response.success) {
                     val hasUpdate = response.update?.hasUpdate == true
+                    val serverVersion = response.update?.version?.takeIf { it.isNotBlank() }
+                    availableUpdateVersion = serverVersion
                     val updateUrl = response.update?.url?.takeIf { it.isNotBlank() }
+                    val needsUpdate =
+                        hasUpdate && updateUrl != null && serverVersion != storedAppVersion
                     _uiState.update { current ->
                         val updated = current.copy(
                             serverStatus = ServerStatus.Available,
-                            updateAvailable = hasUpdate && updateUrl != null,
+                            updateAvailable = needsUpdate,
                             updateUrl = updateUrl,
-                            isUpdating = if (hasUpdate) current.isUpdating else false,
-                            hasAttemptedUpdate = if (hasUpdate) current.hasAttemptedUpdate else false,
-                            updateErrorMessage = if (hasUpdate) current.updateErrorMessage else null
+                            isUpdating = if (needsUpdate) current.isUpdating else false,
+                            hasAttemptedUpdate = if (needsUpdate) current.hasAttemptedUpdate else false,
+                            updateErrorMessage = if (needsUpdate) current.updateErrorMessage else null
                         )
                         decideInitialScreen(updated)
                     }
@@ -240,7 +246,19 @@ class LoginViewModel(
     }
 
     fun onUpdateCompleted() {
-        _uiState.update { it.copy(isUpdating = false, updateErrorMessage = null) }
+        val versionToSave = availableUpdateVersion ?: SessionManager.DEFAULT_APP_VERSION
+        viewModelScope.launch {
+            sessionManager.saveAppVersion(versionToSave)
+            storedAppVersion = versionToSave
+            _uiState.update {
+                it.copy(
+                    isUpdating = false,
+                    updateErrorMessage = null,
+                    updateAvailable = false,
+                    hasAttemptedUpdate = false
+                )
+            }
+        }
     }
 
     fun onUpdateFailed(message: String?) {
@@ -712,6 +730,11 @@ class LoginViewModel(
         viewModelScope.launch {
             sessionManager.coachIdFlow.collect { value ->
                 storedCoachId = value
+            }
+        }
+        viewModelScope.launch {
+            sessionManager.appVersionFlow.collect { version ->
+                storedAppVersion = version
             }
         }
     }
