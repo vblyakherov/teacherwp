@@ -33,4 +33,6 @@
     <string name="attendance_empty_students">В этой группе пока нет учеников.</string>
     <string name="attendance_save_button">Сохранить посещения</string>
     <string name="attendance_save_success">Посещения сохранены</string>
+    <string name="update_downloading">Доступно обновление, скачиваем новую версию…</string>
+    <string name="update_failed">Не удалось обновить приложение. Попробуйте ещё раз позже.</string>
 </resources>
