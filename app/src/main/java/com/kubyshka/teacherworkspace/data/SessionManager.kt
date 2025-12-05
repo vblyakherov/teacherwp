@@ -23,6 +23,7 @@ class SessionManager(private val context: Context) {
     private val teacherName = stringPreferencesKey("teacher_name")
     private val coachId = intPreferencesKey("coach_id")
     private val appVersion = stringPreferencesKey("app_version")
+    private val autoBackupPeriod = stringPreferencesKey("auto_backup_period")
 
     val sessionKeyFlow: Flow<String?> = context.dataStore.data.map { preferences: Preferences ->
         preferences[sessionKey]
@@ -42,6 +43,10 @@ class SessionManager(private val context: Context) {
 
     val appVersionFlow: Flow<String> = context.dataStore.data.map { preferences: Preferences ->
         preferences[appVersion] ?: DEFAULT_APP_VERSION
+    }
+
+    val autoBackupPeriodFlow: Flow<String?> = context.dataStore.data.map { preferences: Preferences ->
+        preferences[autoBackupPeriod]
     }
 
     suspend fun saveSessionKey(value: String) {
@@ -71,6 +76,12 @@ class SessionManager(private val context: Context) {
     suspend fun saveAppVersion(value: String) {
         context.dataStore.edit { preferences ->
             preferences[appVersion] = value
+        }
+    }
+
+    suspend fun saveAutoBackupPeriod(value: String) {
+        context.dataStore.edit { preferences ->
+            preferences[autoBackupPeriod] = value
         }
     }
 
@@ -104,6 +115,7 @@ class SessionManager(private val context: Context) {
             preferences.remove(pinCode)
             preferences.remove(teacherName)
             preferences.remove(coachId)
+            preferences.remove(autoBackupPeriod)
         }
     }
 }

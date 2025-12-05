@@ -21,6 +21,7 @@
     <string name="pin_login_with_password">Войти по логину и паролю</string>
     <string name="schedule_title">Расписание</string>
     <string name="schedule_logout">Выйти</string>
+    <string name="schedule_settings">Настройки</string>
     <string name="schedule_idle_state">Запросите расписание, чтобы увидеть занятия на сегодня.</string>
     <string name="schedule_loading">Загружаем расписание…</string>
     <string name="schedule_empty_message">На сегодня занятий нет.</string>
@@ -39,4 +40,12 @@
     <string name="update_required_description">Установите последнюю версию, чтобы продолжить пользоваться приложением.</string>
     <string name="update_required_button">Установить обновление</string>
     <string name="update_in_progress">Устанавливаем обновление…</string>
+    <string name="settings_title">Настройки</string>
+    <string name="settings_back_to_schedule">К расписанию</string>
+    <string name="settings_auto_backup_description">Выберите, как часто автоматически сохранять данные на Google Диск.</string>
+    <string name="settings_backup_daily">Каждый день</string>
+    <string name="settings_backup_weekly">Раз в неделю</string>
+    <string name="settings_backup_three_hours">Каждые 3 часа</string>
+    <string name="settings_backup_monthly">Раз в месяц</string>
+    <string name="settings_save">Сохранить</string>
 </resources>

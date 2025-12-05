@@ -2,6 +2,8 @@ package com.kubyshka.teacherworkspace.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kubyshka.teacherworkspace.data.AutoBackupManager
+import com.kubyshka.teacherworkspace.data.AutoBackupPeriod
 import com.kubyshka.teacherworkspace.data.SessionManager
 import com.kubyshka.teacherworkspace.data.TeacherRepository
 import com.kubyshka.teacherworkspace.network.ApiResponse
@@ -43,6 +45,7 @@ sealed interface AuthScreen {
     object EnterPin : AuthScreen
     object Schedule : AuthScreen
     object Attendance : AuthScreen
+    object Settings : AuthScreen
 }
 
 sealed interface ScheduleStatus {
@@ -95,12 +98,16 @@ data class LoginUiState(
     val updateUrl: String? = null,
     val isUpdating: Boolean = false,
     val hasAttemptedUpdate: Boolean = false,
-    val updateErrorMessage: String? = null
+    val updateErrorMessage: String? = null,
+    val autoBackupPeriod: AutoBackupPeriod? = null,
+    val isSavingAutoBackup: Boolean = false,
+    val autoBackupStatusMessage: String? = null
 )
 
 class LoginViewModel(
     private val repository: TeacherRepository,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val autoBackupManager: AutoBackupManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -737,10 +744,16 @@ class LoginViewModel(
                 storedAppVersion = version
             }
         }
+        viewModelScope.launch {
+            sessionManager.autoBackupPeriodFlow.collect { storedValue ->
+                val storedPeriod = AutoBackupPeriod.fromKey(storedValue)
+                _uiState.update { it.copy(autoBackupPeriod = storedPeriod) }
+            }
+        }
     }
 
     private fun decideInitialScreen(current: LoginUiState): LoginUiState {
-        if (current.screen == AuthScreen.Schedule || current.screen == AuthScreen.Attendance) {
+        if (current.screen == AuthScreen.Schedule || current.screen == AuthScreen.Attendance || current.screen == AuthScreen.Settings) {
             return current
         }
         return if (current.serverStatus is ServerStatus.Available && !storedPinCode.isNullOrBlank() && !storedSessionKey.isNullOrBlank()) {
@@ -850,6 +863,32 @@ class LoginViewModel(
                 selectedLessonId = null,
                 currentLesson = null
             )
+        }
+    }
+
+    fun openSettings() {
+        _uiState.update { current ->
+            current.copy(screen = AuthScreen.Settings, autoBackupStatusMessage = null)
+        }
+    }
+
+    fun onAutoBackupPeriodSelected(period: AutoBackupPeriod) {
+        _uiState.update { it.copy(autoBackupPeriod = period, autoBackupStatusMessage = null) }
+    }
+
+    fun saveAutoBackupPeriod() {
+        val selectedPeriod = _uiState.value.autoBackupPeriod ?: AutoBackupPeriod.DAILY
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingAutoBackup = true, autoBackupStatusMessage = null) }
+            sessionManager.saveAutoBackupPeriod(selectedPeriod.key)
+            autoBackupManager.schedule(selectedPeriod)
+            _uiState.update {
+                it.copy(
+                    isSavingAutoBackup = false,
+                    autoBackupStatusMessage = "Настройки автосохранения применены",
+                    screen = AuthScreen.Schedule
+                )
+            }
         }
     }
 
