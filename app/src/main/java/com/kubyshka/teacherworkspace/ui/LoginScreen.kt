@@ -27,6 +27,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.kubyshka.teacherworkspace.R
+import com.kubyshka.teacherworkspace.data.AutoBackupPeriod
 import com.kubyshka.teacherworkspace.network.ScheduleItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -132,7 +134,8 @@ fun LoginRoute(viewModel: LoginViewModel) {
                     uiState = uiState,
                     onRefresh = viewModel::refreshSchedule,
                     onLogout = viewModel::logout,
-                    onLessonClick = viewModel::onLessonSelected
+                    onLessonClick = viewModel::onLessonSelected,
+                    onOpenSettings = viewModel::openSettings
                 )
 
                 AuthScreen.Attendance -> AttendanceScreen(
@@ -141,6 +144,13 @@ fun LoginRoute(viewModel: LoginViewModel) {
                     onToggleAttendance = viewModel::toggleStudentAttendance,
                     onSaveAttendance = viewModel::saveLessonAttendance,
                     onBackToSchedule = viewModel::backToScheduleFromAttendance
+                )
+
+                AuthScreen.Settings -> SettingsScreen(
+                    uiState = uiState,
+                    onPeriodSelected = viewModel::onAutoBackupPeriodSelected,
+                    onSave = viewModel::saveAutoBackupPeriod,
+                    onBack = viewModel::backToScheduleFromAttendance
                 )
             }
         }
@@ -479,7 +489,8 @@ private fun ScheduleScreen(
     uiState: LoginUiState,
     onRefresh: () -> Unit,
     onLogout: () -> Unit,
-    onLessonClick: (ScheduleItem) -> Unit
+    onLessonClick: (ScheduleItem) -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -507,9 +518,23 @@ private fun ScheduleScreen(
                     )
                 }
             }
-            TextButton(onClick = onLogout) {
-                Text(text = stringResource(id = R.string.schedule_logout))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onOpenSettings) {
+                    Text(text = stringResource(id = R.string.schedule_settings))
+                }
+                TextButton(onClick = onLogout) {
+                    Text(text = stringResource(id = R.string.schedule_logout))
+                }
             }
+        }
+
+        uiState.autoBackupStatusMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -587,6 +612,107 @@ private fun ScheduleScreen(
                     Text(text = stringResource(id = R.string.schedule_refresh_button))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SettingsScreen(
+    uiState: LoginUiState,
+    onPeriodSelected: (AutoBackupPeriod) -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit
+) {
+    val selectedPeriod = uiState.autoBackupPeriod ?: AutoBackupPeriod.DAILY
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(id = R.string.settings_title),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            TextButton(onClick = onBack) {
+                Text(text = stringResource(id = R.string.settings_back_to_schedule))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = stringResource(id = R.string.settings_auto_backup_description),
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        val options = listOf(
+            AutoBackupPeriod.DAILY,
+            AutoBackupPeriod.WEEKLY,
+            AutoBackupPeriod.EVERY_THREE_HOURS,
+            AutoBackupPeriod.MONTHLY
+        )
+
+        options.forEach { period ->
+            val title = when (period) {
+                AutoBackupPeriod.DAILY -> stringResource(id = R.string.settings_backup_daily)
+                AutoBackupPeriod.WEEKLY -> stringResource(id = R.string.settings_backup_weekly)
+                AutoBackupPeriod.EVERY_THREE_HOURS -> stringResource(id = R.string.settings_backup_three_hours)
+                AutoBackupPeriod.MONTHLY -> stringResource(id = R.string.settings_backup_monthly)
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onPeriodSelected(period) }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = period == selectedPeriod,
+                    onClick = { onPeriodSelected(period) }
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(start = 12.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onSave,
+            enabled = !uiState.isSavingAutoBackup,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (uiState.isSavingAutoBackup) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(text = stringResource(id = R.string.settings_save))
+        }
+
+        uiState.autoBackupStatusMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 12.dp)
+            )
         }
     }
 }

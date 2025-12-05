@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.kubyshka.teacherworkspace.data.AutoBackupManager
 import com.kubyshka.teacherworkspace.data.SessionManager
 import com.kubyshka.teacherworkspace.data.TeacherRepository
 import com.kubyshka.teacherworkspace.network.createTeacherApiService
@@ -18,7 +19,8 @@ class MainActivity : ComponentActivity() {
     private val viewModel: LoginViewModel by viewModels {
         LoginViewModelFactory(
             repository = TeacherRepository(createTeacherApiService()),
-            sessionManager = SessionManager(applicationContext)
+            sessionManager = SessionManager(applicationContext),
+            autoBackupManager = AutoBackupManager(applicationContext)
         )
     }
 
@@ -34,12 +36,13 @@ class MainActivity : ComponentActivity() {
 
 class LoginViewModelFactory(
     private val repository: TeacherRepository,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val autoBackupManager: AutoBackupManager
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LoginViewModel::class.java)) {
-            return LoginViewModel(repository, sessionManager) as T
+            return LoginViewModel(repository, sessionManager, autoBackupManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
